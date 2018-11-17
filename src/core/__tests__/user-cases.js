@@ -48,4 +48,6 @@ describe('user-cases', () => {
     expect(displayName).toBe('Jooooooooooooooseph');
     expect(reaction.mock.calls.length).toBe(2);
   });
+  // TODO: 
+  // describe('SSR', () => {});
 });

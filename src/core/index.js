@@ -7,7 +7,7 @@ type EventProperties = {
   subscribers: Set<Function>,
 };
 
-module.exports = class PubSub {
+class PubSub {
   /* ::
     _title: string
     _priorityQueues: Array<Set<string>>
@@ -17,6 +17,7 @@ module.exports = class PubSub {
     }
     _isPublishing: boolean
     _startOver: boolean
+    _payloads: { [string]: mixed }
   */
   constructor(title?: string) {
     this._title = `@@UPS/${title || 'CORE'}`;
@@ -29,9 +30,7 @@ module.exports = class PubSub {
 
   _publish() {
     // FIXME: trycatch
-    this._isPublishing = true;
     const priorityQueues = this._priorityQueues;
-    const payloads = {};
 
     do {
       this._startOver = false;
@@ -50,79 +49,58 @@ module.exports = class PubSub {
           eventTypes.forEach(eventType => {
             const eventsProperties = this._eventsProperties[eventType];
 
-            // TODO: ?
-            // if (eventsProperties === undefined) return;
-
             const {
               isNewPayload,
               payloadHistory,
               prioritySubscribers: { [priorityQueueIndex]: subscribers },
             } = eventsProperties;
 
-            if (isNewPayload || !payloads.hasOwnProperty(eventType)) {
+            if (isNewPayload || !this._payloads.hasOwnProperty(eventType)) {
               eventsProperties.isNewPayload = false;
-              payloads[eventType] = payloadHistory.shift();
+              this._payloads[eventType] = payloadHistory.shift();
             }
-            const value = payloads[eventType];
+            const value = this._payloads[eventType];
 
             if (subscribers === undefined) return;
 
             subscribers.forEach(subscriber => {
               subscriber(value);
-              // TODO: ?
-              // if (result !== undefined) value = result;
             });
           });
+        }
 
-          if (this._startOver) {
-            priorityQueueIndex = -1;
-          }
+        if (this._startOver) {
+          priorityQueueIndex = -1;
         }
       }
-
-      // TODO: ?
-      // if (this._finalQueue.size === 0) {
-      //   this._isPublishing = false;
-      // }
       const eventTypes = this._finalQueue;
       this._finalQueue = new Set();
 
       eventTypes.forEach(eventType => {
         const eventsProperties = this._eventsProperties[eventType];
 
-        // TODO: ?
-        if (eventsProperties === undefined) {
-          return;
-        }
         const { isNewPayload, payloadHistory, subscribers } = eventsProperties;
 
-        if (isNewPayload || !payloads.hasOwnProperty(eventType)) {
+        if (isNewPayload || !this._payloads.hasOwnProperty(eventType)) {
           eventsProperties.isNewPayload = false;
-          payloads[eventType] = payloadHistory.shift();
+          this._payloads[eventType] = payloadHistory.shift();
         }
-        const value = payloads[eventType];
+        const value = this._payloads[eventType];
 
         if (subscribers === undefined) return;
 
         subscribers.forEach(subscriber => subscriber(value));
       });
-
-      // good for logging
-      const eventsProperties = this._eventsProperties[this._title];
-      if (eventsProperties !== undefined) {
-        eventsProperties.subscribers.forEach(subscriber =>
-          subscriber(payloads),
-        );
-      }
     } while (this._startOver);
-
-    this._isPublishing = false;
   }
 
   _startPublish() {
-    this._startOver = true;
     if (this._isPublishing === false) {
+      this._isPublishing = true;
+      this._payloads = {};
       this._publish();
+      this._isPublishing = false;
+      this._payloads = {};
     } else {
       this._startOver = true;
     }
@@ -146,14 +124,14 @@ module.exports = class PubSub {
 
   subscribe(
     listener: Function,
-    eventType?: string,
+    eventType: string,
     priorityIndex?: number,
   ): () => void {
     if (typeof listener !== 'function') {
       throw new TypeError('Expected the listener to be a function.');
     }
-    if (eventType === undefined) {
-      eventType = this._title;
+    if (typeof eventType !== 'string') {
+      throw new TypeError('Expected the eventType to be a string.');
     }
 
     const priorityQueuesLength = this._priorityQueues.length;
@@ -184,6 +162,7 @@ module.exports = class PubSub {
   }
 
   dispatch(eventType: string, payload?: mixed) {
+    // TODO: maybe remove that?
     if (eventType === this._title) {
       throw new Error('You can not dispatch directly to dispatcher');
     }
@@ -202,4 +181,8 @@ module.exports = class PubSub {
 
     this._startPublish();
   }
-};
+}
+
+export type PubSubType = PubSub;
+
+module.exports = PubSub;
