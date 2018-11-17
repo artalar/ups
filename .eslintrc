@@ -1,0 +1,24 @@
+{
+  "parser": "babel-eslint",
+
+  "plugins": ["flowtype", "jest", "prettier"],
+
+  "extends": [
+    "airbnb-base",
+    "plugin:flowtype/recommended",
+    "plugin:prettier/recommended"
+  ],
+
+  "rules": {
+    "no-param-reassign": "off",
+    "no-prototype-builtins": "off",
+    "no-void": "off",
+    "no-plusplus": "off",
+    "no-underscore-dangle": "off",
+    "prettier/prettier": "error"
+  },
+
+  "env": {
+    "jest/globals": true
+  }
+}
