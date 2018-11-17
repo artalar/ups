@@ -1,133 +1,205 @@
 // @flow
 
-type QueuesPriority = {
-  [string]: string,
+type EventProperties = {
+  payloadHistory: mixed[],
+  isNewPayload: boolean,
+  prioritySubscribers: { [string | number]: Set<Function> },
+  subscribers: Set<Function>,
 };
 
-type Subscribe<S> = ((s: S) => any) => () => void;
+module.exports = class PubSub {
+  /* ::
+    _title: string
+    _priorityQueues: Array<Set<string>>
+    _finalQueue: Set<string>
+    _eventsProperties: {
+      [string]: EventProperties
+    }
+    _isPublishing: boolean
+    _startOver: boolean
+  */
+  constructor(title?: string) {
+    this._title = `@@UPS/${title || 'CORE'}`;
+    this._priorityQueues = [new Set()];
+    this._finalQueue = new Set();
+    this._eventsProperties = {};
+    this._isPublishing = false;
+    this._startOver = false;
+  }
 
-// type AtomCallable<S> = S => S | (() => S);
+  _publish() {
+    // FIXME: trycatch
+    this._isPublishing = true;
+    const priorityQueues = this._priorityQueues;
+    const payloads = {};
 
-// type AtomStatic<S, K> = {
-//   subscribe: Subscribe<S>,
-//   [K]: {
-//     subscribe: Subscribe<S>,
-//   },
-// };
+    do {
+      this._startOver = false;
+      for (
+        let priorityQueueIndex = 0;
+        priorityQueueIndex < priorityQueues.length;
+        priorityQueueIndex++
+      ) {
+        this._startOver = false;
 
-// type Atom<S, K> = AtomCallable<S> & AtomStatic<S, K>
+        const eventTypes = priorityQueues[priorityQueueIndex];
 
-type Atom<S, K> = {
-  (...a: [] | [S]): S,
-  subscribe: Subscribe<S>,
-  [K]: {
-    subscribe: Subscribe<S>,
-  },
-};
+        if (eventTypes.size !== 0) {
+          priorityQueues[priorityQueueIndex] = new Set();
 
-export type AtomCreator<Q> = <S>(s: S) => Atom<S, $Keys<Q>>;
+          eventTypes.forEach(eventType => {
+            const eventsProperties = this._eventsProperties[eventType];
 
-function createAtomCreator<Q: QueuesPriority>(
-  queuePriority: Q,
-): AtomCreator<Q> {
-  const queuePriorityNames: $Keys<Q>[] = Object.keys(queuePriority);
-  const masterQueue: $ObjMap<
-    Q,
-    () => Map<Object, { value: mixed, subscribers: Iterator<Function> }>,
-  > = queuePriorityNames.reduce(
-    (acc, key) => ({ ...acc, [key]: new Map() }),
-    {},
-  );
-  let isNotifying = false;
+            // TODO: ?
+            // if (eventsProperties === undefined) return;
 
-  function notify() {
-    isNotifying = true;
-    for (
-      let currentQueueNameIndex = 0;
-      currentQueueNameIndex < queuePriorityNames.length;
-      currentQueueNameIndex++
-    ) {
-      const currentQueueName = queuePriorityNames[currentQueueNameIndex];
-      const currentQueue = masterQueue[currentQueueName];
+            const {
+              isNewPayload,
+              payloadHistory,
+              prioritySubscribers: { [priorityQueueIndex]: subscribers },
+            } = eventsProperties;
 
-      if (currentQueue.size !== 0) {
-        const iteratedQueue = [...currentQueue.values()];
-        currentQueue.clear();
+            if (isNewPayload || !payloads.hasOwnProperty(eventType)) {
+              eventsProperties.isNewPayload = false;
+              payloads[eventType] = payloadHistory.shift();
+            }
+            const value = payloads[eventType];
 
-        for (const atomDescription of iteratedQueue) {
-          const { value, subscribers } = atomDescription;
-          subscribers.forEach(subscriber => subscriber(value));
+            if (subscribers === undefined) return;
+
+            subscribers.forEach(subscriber => {
+              subscriber(value);
+              // TODO: ?
+              // if (result !== undefined) value = result;
+            });
+          });
+
+          if (this._startOver) {
+            priorityQueueIndex = -1;
+          }
         }
-        // subscribers could updated some atoms
-        // so we need start over
-        currentQueueNameIndex = -1;
       }
-    }
-    isNotifying = false;
+
+      // TODO: ?
+      // if (this._finalQueue.size === 0) {
+      //   this._isPublishing = false;
+      // }
+      const eventTypes = this._finalQueue;
+      this._finalQueue = new Set();
+
+      eventTypes.forEach(eventType => {
+        const eventsProperties = this._eventsProperties[eventType];
+
+        // TODO: ?
+        if (eventsProperties === undefined) {
+          return;
+        }
+        const { isNewPayload, payloadHistory, subscribers } = eventsProperties;
+
+        if (isNewPayload || !payloads.hasOwnProperty(eventType)) {
+          eventsProperties.isNewPayload = false;
+          payloads[eventType] = payloadHistory.shift();
+        }
+        const value = payloads[eventType];
+
+        if (subscribers === undefined) return;
+
+        subscribers.forEach(subscriber => subscriber(value));
+      });
+
+      // good for logging
+      const eventsProperties = this._eventsProperties[this._title];
+      if (eventsProperties !== undefined) {
+        eventsProperties.subscribers.forEach(subscriber =>
+          subscriber(payloads),
+        );
+      }
+    } while (this._startOver);
+
+    this._isPublishing = false;
   }
 
-  function createAtom<S>(initialState: S): $Call<AtomCreator<Q>, S> {
-    const uid = {};
-    let state = initialState;
-    const masterQueueLocal: $ObjMap<
-      Q,
-      () => Set<Function>,
-    > = queuePriorityNames.reduce(
-      (acc, key) => ({ ...acc, [key]: new Set() }),
-      {},
-    );
-
-    function update(newState: S) {
-      state = newState;
-
-      for (let i = 0; i < queuePriorityNames.length; i++) {
-        const targetQueueName = queuePriorityNames[i];
-        const targetQueue = masterQueue[targetQueueName];
-
-        targetQueue.set(uid, {
-          value: state,
-          subscribers: masterQueueLocal[targetQueueName],
-        });
-      }
-
-      if (isNotifying === false) notify();
-
-      return state;
+  _startPublish() {
+    this._startOver = true;
+    if (this._isPublishing === false) {
+      this._publish();
+    } else {
+      this._startOver = true;
     }
+  }
 
-    function atom(...a) {
-      if (a.length === 0) return state;
-      if (a.length === 1) {
-        return update(a[0]);
-      }
-      // TODO:
-      throw new Error();
-    }
-
-    atom.subscribe = function(callback) {
-      const queueName = queuePriorityNames[queuePriorityNames.length - 1];
-      masterQueueLocal[queueName].add(callback);
-      return function() {
-        masterQueueLocal[queueName].delete(callback);
-      };
+  _createEventProperties(): EventProperties {
+    return {
+      payloadHistory: [],
+      isNewPayload: false,
+      subscribers: new Set(),
+      prioritySubscribers: {},
     };
-
-    for (let i = 0; i < queuePriorityNames.length; i++) {
-      const queueName = queuePriorityNames[i];
-      atom[queueName] = {
-        subscribe(callback) {
-          masterQueueLocal[queueName].add(callback);
-          return function() {
-            masterQueueLocal[queueName].delete(callback);
-          };
-        },
-      };
-    }
-
-    return atom;
   }
 
-  return createAtom;
-}
+  _bindSubscriber(subscribers: Set<Function>, listener: Function) {
+    subscribers.add(listener);
+    return function unsubscribe() {
+      subscribers.delete(listener);
+    };
+  }
 
-module.exports = createAtomCreator;
+  subscribe(
+    listener: Function,
+    eventType?: string,
+    priorityIndex?: number,
+  ): () => void {
+    if (typeof listener !== 'function') {
+      throw new TypeError('Expected the listener to be a function.');
+    }
+    if (eventType === undefined) {
+      eventType = this._title;
+    }
+
+    const priorityQueuesLength = this._priorityQueues.length;
+    const eventProperties =
+      this._eventsProperties[eventType] ||
+      (this._eventsProperties[eventType] = this._createEventProperties());
+
+    // "reaction" subscriber
+    if (priorityIndex === undefined) {
+      return this._bindSubscriber(eventProperties.subscribers, listener);
+    }
+
+    if (priorityQueuesLength < priorityIndex) {
+      throw new Error(
+        'Unexpected "priorityIndex" amount. ' +
+          `Current: ${priorityQueuesLength}, requested: ${priorityIndex}`,
+      );
+    }
+    if (priorityQueuesLength === priorityIndex) {
+      this._priorityQueues.push(new Set());
+    }
+
+    const subscribers =
+      eventProperties.prioritySubscribers[priorityIndex] ||
+      (eventProperties.prioritySubscribers[priorityIndex] = new Set());
+
+    return this._bindSubscriber(subscribers, listener);
+  }
+
+  dispatch(eventType: string, payload?: mixed) {
+    if (eventType === this._title) {
+      throw new Error('You can not dispatch directly to dispatcher');
+    }
+
+    const eventProperties = this._eventsProperties[eventType];
+
+    if (eventProperties === undefined) return;
+
+    eventProperties.payloadHistory.push(payload);
+    eventProperties.isNewPayload = true;
+
+    for (let i = 0; i < this._priorityQueues.length; i++) {
+      this._priorityQueues[i].add(eventType);
+    }
+    this._finalQueue.add(eventType);
+
+    this._startPublish();
+  }
+};
