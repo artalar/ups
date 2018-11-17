@@ -5,6 +5,8 @@
 ## 🔋 UPS - universal pub/sub library  for reactive programming <!-- basically it is atoms, really... -->
 <div align="center"><img src="https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/160/mozilla/36/battery_1f50b.png" alt="UPS logo" align="center"></div>
 
+See tests for usage examples
+
 ## TODO: 
 
 - [x] core -->
