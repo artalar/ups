@@ -1,7 +1,7 @@
 // @flow
-import typeof PubSubType from '../core';
+import PubSubType from '../core';
 
-function withLogging(PubSub: PubSubType) {
+function withLogging(PubSub: typeof PubSubType) {
   return class PubSubWithLogging extends PubSub {
     _publish() {
       super._publish();
