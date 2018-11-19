@@ -95,7 +95,7 @@ function createAtomCreator(pb: PubSubType) {
     return omitSetterSignature(combinedAtom);
   }
 
-  return function create(...a) {
+  return function create<T>(...a: [T] | mixed[]) {
     let atom;
     switch (a.length) {
       case 0:
@@ -104,7 +104,7 @@ function createAtomCreator(pb: PubSubType) {
         if (isAtom(a[0])) {
           throw new Error('Please, specify mapper function');
         } else {
-          atom = createAtom(a[0]);
+          atom = createAtom<T>(a[0]);
           atom[IS_ATOM] = true;
           break;
         }

@@ -1,12 +1,11 @@
 {
-  "name": "ups",
-  "version": "1.0.0",
+  "name": "@artalar/ups",
+  "version": "0.0.7",
   "description": "universal pub/sub library",
   "main": "lib/index.js",
   "module": "es/index.js",
-  "typings": "index.d.ts",
   "scripts": {
-    "prepublishOnly": "npm run rebuild && npm run test && npm run flow",
+    "prepublishOnly": "npm run rebuild && npm run test",
     "postpublish": "npm run clean",
     "build": "npm run clean && npm run build:cjs && npm run build:es",
     "build:cjs": "cross-env BABEL_ENV=commonjs webpack",
@@ -54,9 +53,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git@github.com:artalar/ups.git"
+    "url": "git+ssh://git@github.com/artalar/ups.git"
   },
-  "readme": "README.md",
   "bugs": {
     "url": "https://github.com/artalar/ups/issues"
   },
@@ -70,5 +68,8 @@
     "transform": {
       ".jsx?$": "babel-jest"
     }
+  },
+  "directories": {
+    "lib": "lib"
   }
 }
