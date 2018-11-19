@@ -1,5 +1,5 @@
 // @flow
-import type { PubSubType } from './index';
+import typeof PubSubType from '../core';
 
 function withLogging(PubSub: PubSubType) {
   return class PubSubWithLogging extends PubSub {

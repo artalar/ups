@@ -1,58 +1,108 @@
 // @flow
 
 const PubSub = require('../index.js');
-const withLogging = require('../withLogging.js');
 
 describe('core', () => {
-  describe('subscribe', () => {
-    const PubSubWithLogging = withLogging(PubSub);
-    const log = [];
-    const pb = new PubSubWithLogging();
+  describe('basics', () => {
+    const pb = new PubSub();
     const EVENT_TYPE = 'EVENT_TYPE';
     const EVENT_TYPE_UNEXIST = 'EVENT_TYPE_UNEXIST';
+    const EVENT_TYPE_THROW = 'EVENT_TYPE_THROW';
+    let EVENT_TYPE_UNUSED = 'EVENT_TYPE_UNUSED';
     const cb1 = jest.fn();
     const cb2 = jest.fn();
-    const cbLog = jest.fn(value => {
-      log.push(value);
-    });
+    const calls = {
+      cb1: 0,
+      cb2: 0,
+    };
 
-    pb.subscribe(cbLog);
-
-    const unsubscribe = pb.subscribe(cb1, EVENT_TYPE);
+    let unsubscribe = pb.subscribe(cb1, EVENT_TYPE);
+    pb.subscribe(cb2, EVENT_TYPE_UNUSED);
+    EVENT_TYPE_UNUSED = null;
 
     it('dispatch', () => {
       pb.dispatch(EVENT_TYPE);
 
-      expect(cb1.mock.calls.length).toBe(1);
+      expect(cb1.mock.calls.length).toBe(++calls.cb1);
     });
+
     it('receive argument', () => {
       pb.dispatch(EVENT_TYPE, true);
 
-      expect(cb1.mock.calls.length).toBe(2);
+      expect(cb1.mock.calls.length).toBe(++calls.cb1);
       expect(cb1.mock.calls[1][0]).toBe(true);
     });
+
     it('unsubscribe', () => {
       unsubscribe();
-      pb.dispatch(EVENT_TYPE, false);
+      pb.dispatch(EVENT_TYPE);
 
-      expect(cb1.mock.calls.length).toBe(2);
+      expect(cb1.mock.calls.length).toBe(calls.cb1);
+
+      unsubscribe = pb.subscribe(cb1, EVENT_TYPE);
+      pb.dispatch(EVENT_TYPE);
+
+      expect(cb1.mock.calls.length).toBe(++calls.cb1);
     });
+
     it('only relative subscriber calls', () => {
-      expect(cb2.mock.calls.length).toBe(0);
+      expect(cb2.mock.calls.length).toBe(calls.cb2);
     });
+
     it('call unexist event', () => {
       pb.dispatch(EVENT_TYPE_UNEXIST, null);
+
+      expect(cb1.mock.calls.length).toBe(calls.cb1);
+      expect(cb2.mock.calls.length).toBe(calls.cb2);
     });
-    it('all logs', () => {
-      expect(cbLog.mock.calls.length).toBe(3);
-      expect(log).toEqual([
-        { EVENT_TYPE: undefined },
-        { EVENT_TYPE: true },
-        // TODO: do we need publish events without subscribers?
-        { EVENT_TYPE: false },
-        // TODO: do we need logs unexist (without subscribers) event?
-        // { EVENT_TYPE_UNEXIST: null },
-      ]);
+
+    it('can not dispatch to it self', () => {
+      let error;
+      try {
+        pb.dispatch(pb._title);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe('Can not dispatch directly to dispatcher');
+
+      expect(cb1.mock.calls.length).toBe(calls.cb1);
+      expect(cb2.mock.calls.length).toBe(calls.cb2);
+    });
+
+    it('throw', () => {
+      const tag = 'test_g90384gf76swdf2#$54TG';
+      let error;
+      pb.subscribe(() => {
+        throw new Error(tag);
+      }, EVENT_TYPE_THROW);
+
+      try {
+        pb.dispatch(EVENT_TYPE_THROW);
+      } catch (e) {
+        error = e;
+      }
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe(tag);
+
+      error = null;
+
+      try {
+        pb.dispatch(EVENT_TYPE_THROW);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe(tag);
+
+      expect(cb1.mock.calls.length).toBe(calls.cb1);
+      expect(cb2.mock.calls.length).toBe(calls.cb2);
+
+      pb.dispatch(EVENT_TYPE);
+
+      expect(cb1.mock.calls.length).toBe(++calls.cb1);
+      expect(cb2.mock.calls.length).toBe(calls.cb2);
     });
   });
   it('compute circular', () => {

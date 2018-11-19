@@ -29,7 +29,6 @@ class PubSub {
   }
 
   _publish() {
-    // FIXME: trycatch
     const priorityQueues = this._priorityQueues;
 
     do {
@@ -63,9 +62,7 @@ class PubSub {
 
             if (subscribers === undefined) return;
 
-            subscribers.forEach(subscriber => {
-              subscriber(value);
-            });
+            subscribers.forEach(subscriber => subscriber(value));
           });
         }
 
@@ -98,7 +95,14 @@ class PubSub {
     if (this._isPublishing === false) {
       this._isPublishing = true;
       this._payloads = {};
-      this._publish();
+      try {
+        this._publish();
+      } catch (error) {
+        this._isPublishing = false;
+        this._payloads = {};
+        throw error;
+      }
+
       this._isPublishing = false;
       this._payloads = {};
     } else {
@@ -162,9 +166,9 @@ class PubSub {
   }
 
   dispatch(eventType: string, payload?: mixed) {
-    // TODO: maybe remove that?
     if (eventType === this._title) {
-      throw new Error('You can not dispatch directly to dispatcher');
+      // need for `withLogging`
+      throw new Error('Can not dispatch directly to dispatcher');
     }
 
     const eventProperties = this._eventsProperties[eventType];
@@ -182,7 +186,5 @@ class PubSub {
     this._startPublish();
   }
 }
-
-export type PubSubType = PubSub;
 
 module.exports = PubSub;
