@@ -34,25 +34,30 @@ class PubSub {
     do {
       this._startOver = false;
       for (
-        let priorityQueueIndex = 0;
-        priorityQueueIndex < priorityQueues.length;
-        priorityQueueIndex++
+        let priorityQueueIndex = 0, isLastQueue = false;
+        priorityQueueIndex < priorityQueues.length || isLastQueue;
+        priorityQueueIndex++,
+          isLastQueue = priorityQueueIndex === priorityQueues.length
       ) {
         this._startOver = false;
+        let eventTypes;
 
-        const eventTypes = priorityQueues[priorityQueueIndex];
+        if (isLastQueue) {
+          eventTypes = this._finalQueue;
+          this._finalQueue = new Set();
+        } else {
+          eventTypes = priorityQueues[priorityQueueIndex];
+          priorityQueues[priorityQueueIndex] = new Set();
+        }
 
         if (eventTypes.size !== 0) {
-          priorityQueues[priorityQueueIndex] = new Set();
-
           eventTypes.forEach(eventType => {
             const eventsProperties = this._eventsProperties[eventType];
 
-            const {
-              isNewPayload,
-              payloadHistory,
-              prioritySubscribers: { [priorityQueueIndex]: subscribers },
-            } = eventsProperties;
+            const { isNewPayload, payloadHistory } = eventsProperties;
+            const subscribers = isLastQueue
+              ? eventsProperties.subscribers
+              : eventsProperties.prioritySubscribers[priorityQueueIndex];
 
             if (isNewPayload || !this._payloads.hasOwnProperty(eventType)) {
               eventsProperties.isNewPayload = false;
@@ -70,24 +75,6 @@ class PubSub {
           priorityQueueIndex = -1;
         }
       }
-      const eventTypes = this._finalQueue;
-      this._finalQueue = new Set();
-
-      eventTypes.forEach(eventType => {
-        const eventsProperties = this._eventsProperties[eventType];
-
-        const { isNewPayload, payloadHistory, subscribers } = eventsProperties;
-
-        if (isNewPayload || !this._payloads.hasOwnProperty(eventType)) {
-          eventsProperties.isNewPayload = false;
-          this._payloads[eventType] = payloadHistory.shift();
-        }
-        const value = this._payloads[eventType];
-
-        if (subscribers === undefined) return;
-
-        subscribers.forEach(subscriber => subscriber(value));
-      });
     } while (this._startOver);
   }
 
@@ -166,11 +153,6 @@ class PubSub {
   }
 
   dispatch(eventType: string, payload?: mixed) {
-    if (eventType === this._title) {
-      // need for `withLogging`
-      throw new Error('Can not dispatch directly to dispatcher');
-    }
-
     const eventProperties = this._eventsProperties[eventType];
 
     if (eventProperties === undefined) return;

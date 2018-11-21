@@ -39,5 +39,16 @@ describe('withLogging', () => {
         // { EVENT_TYPE_UNEXIST: null },
       ]);
     });
+
+    it('can not dispatch to it self', () => {
+      let error;
+      try {
+        pb.dispatch(pb._title);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe('Can not dispatch directly to dispatcher');
+    });
   });
 });

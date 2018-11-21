@@ -20,6 +20,13 @@ function withLogging(PubSub: typeof PubSubType) {
       }
       return super.subscribe(listener, eventType, priorityIndex);
     }
+
+    dispatch(eventType: string, payload?: mixed) {
+      if (eventType === this._title) {
+        throw new Error('Can not dispatch directly to dispatcher');
+      }
+      return super.dispatch(eventType, payload);
+    }
   };
 }
 

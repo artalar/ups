@@ -56,20 +56,6 @@ describe('core', () => {
       expect(cb2.mock.calls.length).toBe(calls.cb2);
     });
 
-    it('can not dispatch to it self', () => {
-      let error;
-      try {
-        pb.dispatch(pb._title);
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(Error);
-      expect(error.message).toBe('Can not dispatch directly to dispatcher');
-
-      expect(cb1.mock.calls.length).toBe(calls.cb1);
-      expect(cb2.mock.calls.length).toBe(calls.cb2);
-    });
-
     it('throw', () => {
       const tag = 'test_g90384gf76swdf2#$54TG';
       let error;
