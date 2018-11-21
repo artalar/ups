@@ -1,3 +1,4 @@
+/* eslint-disable */
 // @flow
 
 const PubSub = require('../../core');
@@ -5,7 +6,7 @@ const createAtomCreator = require('../');
 
 const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
-describe('react', () => {
+describe('atom', () => {
   it('map', () => {
     const createAtom = createAtomCreator(new PubSub());
 
@@ -33,8 +34,10 @@ describe('react', () => {
 
     const FullName = createAtom(FirstName, LastName, names => names.join(' '));
 
-    const DisplayName = createAtom(FirstName, FullName, ([firstName, fullName]) =>
-      firstName.length < 10 ? fullName : firstName,
+    const DisplayName = createAtom(
+      FirstName,
+      FullName,
+      ([firstName, fullName]) => (firstName.length < 10 ? fullName : firstName),
     );
 
     const view = jest.fn();
@@ -139,5 +142,48 @@ describe('react', () => {
     // expect(fullNameMap.mock.calls.length).toBe(3);
     // expect(displayNameMap.mock.calls.length).toBe(3);
     // expect(view.mock.calls.length).toBe(2);
+  });
+
+  it('async', async () => {
+    const cb = jest.fn();
+    const createAtom = createAtomCreator(new PubSub());
+
+    async function updateUser(fetcher) {
+      Status({ status: 'req' });
+      try {
+        Status({ status: 'res', data: await fetcher() });
+      } catch (error) {
+        Status({ status: 'err', error });
+      }
+    }
+
+    const Status = createAtom({
+      status: 'idle',
+    });
+
+    const Data = createAtom(Status, ({ status, data }) =>
+      status === 'res' ? data : [],
+    );
+
+    const ErrorStatus = createAtom(Status, ({ status, error }) =>
+      status === 'err' ? error : null,
+    );
+
+    const Feature = createAtom(Status, Data, ErrorStatus, data => data);
+
+    Feature.subscribe(data => cb([...data]));
+
+    await updateUser(() => new Promise(r => setTimeout(r, 50, [1, 2, 3])));
+
+    expect(Data()).toEqual([1, 2, 3]);
+    expect(Status().status).toEqual('res');
+    expect(ErrorStatus()).toBe(null);
+    expect(cb.mock.calls.length).toBe(2);
+    expect(cb.mock.calls[0][0]).toEqual([{ status: 'req' }, [], null]);
+    expect(cb.mock.calls[1][0]).toEqual([
+      { status: 'res', data: [1, 2, 3] },
+      [1, 2, 3],
+      null,
+    ]);
   });
 });
