@@ -20,11 +20,22 @@ class PubSub {
   */
   constructor(title?: string) {
     this._title = `@@UPS/${title || 'CORE'}`;
-    this._priorityQueues = [new Set()];
-    this._finalQueue = new Set();
+    this._priorityQueues = [this._createQueue()];
+    this._finalQueue = this._createQueue();
     this._eventsProperties = {};
     this._isPublishing = false;
     this._startOver = false;
+  }
+
+  // `Set` can be replaced by simplest `Set` polyfill
+  // `{ add(cb){ this._list.push(cb) ... } }`
+  // for old browsers
+  _createQueue(): Set<string> {
+    return new Set();
+  }
+
+  _createSubscribers(): Set<Function> {
+    return new Set();
   }
 
   _publish() {
@@ -43,10 +54,10 @@ class PubSub {
 
         if (isLastQueue) {
           eventTypes = this._finalQueue;
-          this._finalQueue = new Set();
+          this._finalQueue = this._createQueue();
         } else {
           eventTypes = priorityQueues[priorityQueueIndex];
-          priorityQueues[priorityQueueIndex] = new Set();
+          priorityQueues[priorityQueueIndex] = this._createQueue();
         }
 
         if (eventTypes.size !== 0) {
@@ -98,7 +109,7 @@ class PubSub {
 
   _createEventProperties(): EventProperties {
     return {
-      subscribers: new Set(),
+      subscribers: this._createSubscribers(),
       prioritySubscribers: {},
     };
   }
@@ -139,12 +150,15 @@ class PubSub {
       );
     }
     if (priorityQueuesLength === priorityIndex) {
-      this._priorityQueues.push(new Set());
+      this._priorityQueues.push(this._createQueue());
     }
 
-    const subscribers =
-      eventProperties.prioritySubscribers[priorityIndex] ||
-      (eventProperties.prioritySubscribers[priorityIndex] = new Set());
+    if (!eventProperties.prioritySubscribers[priorityIndex]) {
+      eventProperties.prioritySubscribers[
+        priorityIndex
+      ] = this._createSubscribers();
+    }
+    const subscribers = eventProperties.prioritySubscribers[priorityIndex];
 
     return this._bindSubscriber(subscribers, listener);
   }
