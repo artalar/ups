@@ -3,42 +3,64 @@ import PubSubType from '../core';
 
 type AtomStatic<T> = {
   eventType: string,
-  subscribe: (cb: (state: T) => any) => () => void,
+  subscribe: (cb: (state: T) => *) => () => void,
   '@@UPS/ATOM/IS_ATOM': true,
   '@@UPS/ATOM/COMPUTED_LEVEL': number,
 };
 
-type Atom<T> = {
-  (newState?: T): T,
-  ...AtomStatic<T>,
-};
+type Atom<T> = ((newState?: T) => T) & AtomStatic<T>;
 
-type AtomWithoutSet<T> = {
-  (): T,
-  ...(() => T) & AtomStatic<T>,
-};
+type AtomWithoutSet<T> = (() => T) & AtomStatic<T>;
 
+type CreateAtomPlain = <State>(
+  initialState: State,
+  description?: string,
+) => Atom<State>;
+
+type CreateAtomFrom = <State, PublisherState>(
+  pub: Atom<PublisherState>,
+  map: (s: PublisherState) => State,
+) => (() => State) & AtomStatic<State>;
+
+type CombineAtoms = <T: $ReadOnlyArray<Atom<*>>>(
+  atoms: T,
+) => Atom<$TupleMap<T, <A>(a: A) => $Call<A>>>;
+
+// eslint-disable-next-line
 const IS_ATOM = '@@UPS/ATOM/IS_ATOM';
 const COMPUTED_LEVEL = '@@UPS/ATOM/COMPUTED_LEVEL';
 const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
+function isAtom(atom): %checks {
+  // TODO:
+  // $off
+  return Boolean(atom && atom['@@UPS/ATOM/IS_ATOM'] === true);
+}
+
 function withAtoms(PubSub: typeof PubSubType) {
   return class PubSubWithAtoms extends PubSub {
-    /* ::
-      _atomsCount: number
-    */
-    constructor(...a) {
+    _atomsCount: number;
+
+    createAtomPlain: CreateAtomPlain;
+
+    createAtomFrom: CreateAtomFrom;
+
+    combineAtoms: CombineAtoms;
+
+    createAtom: CreateAtomPlain | CreateAtomFrom | CombineAtoms;
+
+    constructor(...a: [] | [string]) {
       super(...a);
 
       this._atomsCount = 0;
+      // $off
       this.createAtomPlain = this.createAtomPlain.bind(this);
+      // $off
       this.createAtomFrom = this.createAtomFrom.bind(this);
+      // $off
       this.combineAtoms = this.combineAtoms.bind(this);
+      // $off
       this.createAtom = this.createAtom.bind(this);
-    }
-
-    _isAtom<T>(atom: ?Atom<T>): boolean {
-      return Boolean(atom && atom[IS_ATOM] === true);
     }
 
     _omitSetterSignature<T>(originalAtom: Atom<T>): AtomWithoutSet<T> {
@@ -46,6 +68,8 @@ function withAtoms(PubSub: typeof PubSubType) {
         if (a.length === 0) return originalAtom();
         throw new TypeError('Combined atom can not set the value');
       }
+      // TODO:
+      // $off
       return Object.assign(atom, originalAtom);
     }
 
@@ -57,20 +81,25 @@ function withAtoms(PubSub: typeof PubSubType) {
 
       function atom(newState?: State): State {
         if (arguments.length !== 0) {
+          // TODO:
+          // $off
           state = newState;
           this.dispatch(atom.eventType, state);
         }
         return state;
       }
+      // eslint-disable-next-line
       atom = atom.bind(this);
 
       atom.eventType = `@@UPS/ATOM/[${++this._atomsCount}] ${description}`;
 
       atom.subscribe = cb => this.subscribe(cb, atom.eventType);
 
-      atom[IS_ATOM] = true;
-      atom[COMPUTED_LEVEL] = 0;
+      atom['@@UPS/ATOM/IS_ATOM'] = true;
+      atom['@@UPS/ATOM/COMPUTED_LEVEL'] = 0;
 
+      // TODO:
+      // $off
       return atom;
     }
 
@@ -79,7 +108,7 @@ function withAtoms(PubSub: typeof PubSubType) {
       pub: Atom<PublisherState>,
       map: (s: PublisherState) => State,
     ): (() => State) & AtomStatic<State> {
-      if (!this._isAtom(pub)) throw new Error('Publisher is not atom');
+      if (!isAtom(pub)) throw new Error('Publisher is not atom');
 
       const atom = this.createAtomPlain(map(pub()));
 
@@ -97,19 +126,15 @@ function withAtoms(PubSub: typeof PubSubType) {
       return this._omitSetterSignature(atom);
     }
 
-    combineAtoms<T>(
+    combineAtoms<T: $ReadOnlyArray<Atom<*>>>(
       // eslint-disable-next-line
       atoms: T,
-    ) {
-      if (atoms.length < 2 || atoms.length > 4) {
-        throw new TypeError('TODO: flow...');
-      }
-
+    ): Atom<$TupleMap<T, <A>(a: A) => $Call<A>>> {
       let maxComputedLevel = 0;
       // eslint-disable-next-line
       const atomsValue: $TupleMap<T, <A>(a: A) => $Call<A>> = atoms.map(
         atom => {
-          if (!this._isAtom(atom)) throw new Error('Atom is not atom');
+          if (!isAtom(atom)) throw new Error('Atom is not atom');
           maxComputedLevel = Math.max(atom[COMPUTED_LEVEL], maxComputedLevel);
           return atom();
         },
@@ -133,6 +158,8 @@ function withAtoms(PubSub: typeof PubSubType) {
       return this._omitSetterSignature(combinedAtom);
     }
 
+    // TODO:
+    // $off
     createAtom<T, T1, T21, T22, T31, T32, T33, T41, T42, T43, T44>(
       // eslint-disable-next-line
       ...a:
@@ -149,25 +176,34 @@ function withAtoms(PubSub: typeof PubSubType) {
         case 0:
           throw new Error('Please, specify arguments');
         case 1:
-          if (this._isAtom(a[0]))
-            throw new Error('Please, specify mapper function');
+          if (isAtom(a[0])) throw new Error('Please, specify mapper function');
+          // $off
           return this.createAtomPlain<T>(a[0]);
         case 2:
-          if (this._isAtom(a[a.length - 1]))
-            return this.combineAtoms<[T21, T22]>(a);
+          // $off
+          if (isAtom(a[a.length - 1])) return this.combineAtoms<[T21, T22]>(a);
+          // $off
           return this.createAtomFrom<T1>(a[0], a[1]);
         case 3:
-          if (this._isAtom(a[a.length - 1]))
+          if (isAtom(a[a.length - 1]))
+            // $off
             return this.combineAtoms<[T31, T32, T33]>(a);
+          // $off
           return this.createAtomFrom(
+            // $off
             this.combineAtoms<[T31, T32]>([a[0], a[1]]),
+            // $off
             a[2],
           );
         case 4:
-          if (this._isAtom(a[a.length - 1]))
+          if (isAtom(a[a.length - 1]))
+            // $off
             return this.combineAtoms<[T41, T42, T43, T44]>(a);
+          // $off
           return this.createAtomFrom(
+            // $off
             this.combineAtoms<[T41, T42, T43]>([a[0], a[1], a[2]]),
+            // $off
             a[3],
           );
         default:
