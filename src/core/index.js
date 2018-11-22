@@ -94,9 +94,16 @@ class PubSub {
       this._payloads = {};
       try {
         this._publish();
-      } catch (error) {
+      } catch (e) {
         this._isPublishing = false;
         this._payloads = {};
+        if (e instanceof Error) throw e;
+        if (typeof e === 'string') throw new Error(e);
+        const error = new Error(
+          '@@UPS/ error when notifying subscribers.' +
+            '\nSee error data in `data` property of this Error instance',
+        );
+        error.data = e;
         throw error;
       }
 
