@@ -1,8 +1,7 @@
 // @flow
 
 type EventProperties = {
-  payloadHistory: mixed[],
-  isNewPayload: boolean,
+  payload?: mixed,
   prioritySubscribers: { [string | number]: Set<Function> },
   subscribers: Set<Function>,
 };
@@ -54,15 +53,15 @@ class PubSub {
           eventTypes.forEach(eventType => {
             const eventsProperties = this._eventsProperties[eventType];
 
-            const { isNewPayload, payloadHistory } = eventsProperties;
             const subscribers = isLastQueue
               ? eventsProperties.subscribers
               : eventsProperties.prioritySubscribers[priorityQueueIndex];
 
-            if (isNewPayload || !this._payloads.hasOwnProperty(eventType)) {
-              eventsProperties.isNewPayload = false;
-              this._payloads[eventType] = payloadHistory.shift();
+            if ('payload' in eventsProperties) {
+              this._payloads[eventType] = eventsProperties.payload;
+              delete eventsProperties.payload;
             }
+
             const value = this._payloads[eventType];
 
             if (subscribers === undefined) return;
@@ -99,8 +98,6 @@ class PubSub {
 
   _createEventProperties(): EventProperties {
     return {
-      payloadHistory: [],
-      isNewPayload: false,
       subscribers: new Set(),
       prioritySubscribers: {},
     };
@@ -153,12 +150,15 @@ class PubSub {
   }
 
   dispatch(eventType: string, payload?: mixed) {
+    if (typeof eventType !== 'string') {
+      throw new TypeError('Expected the eventType to be a string.');
+    }
+
     const eventProperties = this._eventsProperties[eventType];
 
     if (eventProperties === undefined) return;
 
-    eventProperties.payloadHistory.push(payload);
-    eventProperties.isNewPayload = true;
+    eventProperties.payload = payload;
 
     for (let i = 0; i < this._priorityQueues.length; i++) {
       this._priorityQueues[i].add(eventType);
