@@ -2,32 +2,13 @@
 // @flow
 
 const PubSub = require('../../core');
-const createAtomCreator = require('../');
+const withAtoms = require('../');
 
 const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
-describe('atom', () => {
-  it('map', () => {
-    const createAtom = createAtomCreator(new PubSub());
-
-    const One = createAtom('one');
-    const Two = createAtom('two');
-    const Shape = createAtom(One, Two, ([one, two]) => ({ one, two }));
-    const One2 = createAtom(Shape, ({ one }) => one);
-    const Two2 = createAtom(Shape, ({ two }) => two);
-
-    const Shape2 = createAtom(One2, Two2, ([one, two]) => ({ one, two }));
-
-    const view = jest.fn();
-    Shape2.subscribe(view);
-
-    One('one!');
-    expect(Shape2()).toEqual({ one: 'one!', two: 'two' });
-    expect(view.mock.calls.length).toBe(1);
-  });
-
+describe('user-cases', () => {
   it('rhombus', () => {
-    const createAtom = createAtomCreator(new PubSub());
+    const { createAtom } = new (withAtoms(PubSub))();
 
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
@@ -53,7 +34,7 @@ describe('atom', () => {
   });
 
   it('rhombus memorized map', () => {
-    const createAtom = createAtomCreator(new PubSub());
+    const { createAtom } = new (withAtoms(PubSub))();
     const memoize = map => {
       let lastValue;
       return v => {
@@ -97,7 +78,7 @@ describe('atom', () => {
   });
 
   it('rhombus detailed', () => {
-    const createAtom = createAtomCreator(new PubSub());
+    const { createAtom } = new (withAtoms(PubSub))();
 
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
@@ -145,8 +126,8 @@ describe('atom', () => {
   });
 
   it('async', async () => {
+    const { createAtom } = new (withAtoms(PubSub))();
     const cb = jest.fn();
-    const createAtom = createAtomCreator(new PubSub());
 
     async function updateUser(fetcher) {
       Status({ status: 'req' });
@@ -169,9 +150,12 @@ describe('atom', () => {
       status === 'err' ? error : null,
     );
 
-    const Feature = createAtom(Status, Data, ErrorStatus, data => data);
+    const Feature = createAtom(Status, Data, ErrorStatus);
 
-    Feature.subscribe(data => cb([...data]));
+    Feature.subscribe(data => {
+      expect(data).toBe(Feature())
+      cb(data)
+    });
 
     await updateUser(() => new Promise(r => setTimeout(r, 50, [1, 2, 3])));
 
