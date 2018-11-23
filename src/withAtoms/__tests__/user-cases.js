@@ -13,11 +13,12 @@ describe('user-cases', () => {
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
 
-    const FullName = createAtom(FirstName, LastName, names => names.join(' '));
+    const FullName = createAtom([FirstName, LastName], names =>
+      names.join(' '),
+    );
 
     const DisplayName = createAtom(
-      FirstName,
-      FullName,
+      [FirstName, FullName],
       ([firstName, fullName]) => (firstName.length < 10 ? fullName : firstName),
     );
 
@@ -49,11 +50,12 @@ describe('user-cases', () => {
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
 
-    const FullName = createAtom(FirstName, LastName, names => names.join(' '));
+    const FullName = createAtom([FirstName, LastName], names =>
+      names.join(' '),
+    );
 
     const DisplayName = createAtom(
-      FirstName,
-      FullName,
+      [FirstName, FullName],
       memoize(([firstName, fullName]) =>
         firstName.length < 10 ? fullName : firstName,
       ),
@@ -83,19 +85,17 @@ describe('user-cases', () => {
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
 
-    const isFirstNameShortMap = jest.fn(v => v.length < 10);
-    const IsFirstNameShort = createAtom(FirstName, isFirstNameShortMap);
+    const isFirstNameShortMap = jest.fn(([v]) => v.length < 10);
+    const IsFirstNameShort = createAtom([FirstName], isFirstNameShortMap);
 
     const fullNameMap = jest.fn(names => names.join(' '));
-    const FullName = createAtom(FirstName, LastName, fullNameMap);
+    const FullName = createAtom([FirstName, LastName], fullNameMap);
 
     const displayNameMap = jest.fn(([firstName, isFirstNameShort, fullName]) =>
       isFirstNameShort ? fullName : firstName,
     );
     const DisplayName = createAtom(
-      FirstName,
-      IsFirstNameShort,
-      FullName,
+      [FirstName, IsFirstNameShort, FullName],
       displayNameMap,
     );
 
@@ -142,19 +142,22 @@ describe('user-cases', () => {
       status: 'idle',
     });
 
-    const Data = createAtom(Status, ({ status, data }) =>
+    const Data = createAtom([Status], ([{ status, data }]) =>
       status === 'res' ? data : [],
     );
 
-    const ErrorStatus = createAtom(Status, ({ status, error }) =>
+    const ErrorStatus = createAtom([Status], ([{ status, error }]) =>
       status === 'err' ? error : null,
     );
 
-    const Feature = createAtom(Status, Data, ErrorStatus);
+    const Feature = createAtom(
+      { status: Status, data: Data, error: ErrorStatus },
+      v => v,
+    );
 
     Feature.subscribe(data => {
-      expect(data).toBe(Feature())
-      cb(data)
+      expect(data).toBe(Feature());
+      cb(data);
     });
 
     await updateUser(() => new Promise(r => setTimeout(r, 50, [1, 2, 3])));
@@ -163,11 +166,15 @@ describe('user-cases', () => {
     expect(Status().status).toEqual('res');
     expect(ErrorStatus()).toBe(null);
     expect(cb.mock.calls.length).toBe(2);
-    expect(cb.mock.calls[0][0]).toEqual([{ status: 'req' }, [], null]);
-    expect(cb.mock.calls[1][0]).toEqual([
-      { status: 'res', data: [1, 2, 3] },
-      [1, 2, 3],
-      null,
-    ]);
+    expect(cb.mock.calls[0][0]).toEqual({
+      status: { status: 'req' },
+      data: [],
+      error: null,
+    });
+    expect(cb.mock.calls[1][0]).toEqual({
+      status: { status: 'res', data: [1, 2, 3] },
+      data: [1, 2, 3],
+      error: null,
+    });
   });
 });

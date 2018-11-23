@@ -17,14 +17,17 @@ type CreateAtomPlain = <State>(
   description?: string,
 ) => Atom<State>;
 
-type CreateAtomFrom = <State, PublisherState>(
-  pub: Atom<PublisherState>,
-  map: (s: PublisherState) => State,
-) => (() => State) & AtomStatic<State>;
+type CombineAtomsResult<T> =
+  | $TupleMap<T, <A>(a: A) => $Call<A>>
+  | $ObjMap<T, <A>(a: A) => $Call<A>>;
 
-type CombineAtoms = <T: $ReadOnlyArray<Atom<*>>>(
+type CombineAtoms = <
+  T: $ReadOnlyArray<Atom<*>> | { [string]: Atom<*> },
+  M: Function,
+>(
   atoms: T,
-) => Atom<$TupleMap<T, <A>(a: A) => $Call<A>>>;
+  mapper: M,
+) => Atom<$Call<CombineAtomsResult<T>, M>>;
 
 // eslint-disable-next-line
 const IS_ATOM = '@@UPS/ATOM/IS_ATOM';
@@ -43,11 +46,9 @@ function withAtoms(PubSub: typeof PubSubType) {
 
     createAtomPlain: CreateAtomPlain;
 
-    createAtomFrom: CreateAtomFrom;
-
     combineAtoms: CombineAtoms;
 
-    createAtom: CreateAtomPlain | CreateAtomFrom | CombineAtoms;
+    createAtom: CreateAtomPlain | CombineAtoms;
 
     constructor(...a: [] | [string]) {
       super(...a);
@@ -55,8 +56,6 @@ function withAtoms(PubSub: typeof PubSubType) {
       this._atomsCount = 0;
       // $off
       this.createAtomPlain = this.createAtomPlain.bind(this);
-      // $off
-      this.createAtomFrom = this.createAtomFrom.bind(this);
       // $off
       this.combineAtoms = this.combineAtoms.bind(this);
       // $off
@@ -104,111 +103,68 @@ function withAtoms(PubSub: typeof PubSubType) {
     }
 
     // TODO: GC
-    createAtomFrom<State, PublisherState>(
-      pub: Atom<PublisherState>,
-      map: (s: PublisherState) => State,
-    ): (() => State) & AtomStatic<State> {
-      if (!isAtom(pub)) throw new Error('Publisher is not atom');
+    combineAtoms<
+      T: $ReadOnlyArray<Atom<*>> | { [string]: Atom<*> },
+      M: Function,
+    >(atoms: T, mapper: M): Atom<$Call<M, CombineAtomsResult<T>>> {
+      let maxComputedLevel = 0;
+      const isList = Array.isArray(atoms);
+      // TODO:
+      // const keys: (Object | mixed[]) => string[] = (Object.keys: any)
+      const atomsIndex = Object.keys(atoms);
+      const atomsValue: CombineAtomsResult<T> = atomsIndex.reduce(
+        (acc, key) => {
+          const atom = atoms[key];
+          if (!isAtom(atom)) {
+            throw new Error(`Property with key "${key}" is not atom`);
+          }
+          maxComputedLevel = Math.max(atom[COMPUTED_LEVEL], maxComputedLevel);
+          acc[key] = atom();
+          return acc;
+        },
+        isList ? [] : {},
+      );
 
-      const atom = this.createAtomPlain(map(pub()));
+      const combinedAtom = this.createAtomPlain(atomsValue);
 
-      atom[COMPUTED_LEVEL] = pub[COMPUTED_LEVEL] + 1;
+      combinedAtom[COMPUTED_LEVEL] = maxComputedLevel + 1;
+
+      for (let i = 0; i < atomsIndex.length; i++) {
+        const key = atomsIndex[i];
+        this.subscribe(
+          // eslint-disable-next-line
+          newValue => {
+            const accumulator = isList
+              ? combinedAtom().slice(0)
+              : Object.assign({}, combinedAtom());
+            accumulator[key] = newValue;
+            combinedAtom(accumulator);
+          },
+          atoms[key].eventType,
+          maxComputedLevel,
+        );
+      }
+
+      const atom = this.createAtomPlain(mapper(combinedAtom()));
+
+      atom[COMPUTED_LEVEL] = combinedAtom[COMPUTED_LEVEL] + 1;
 
       this.subscribe(
-        (value: PublisherState) => {
-          const newValue = map(value);
+        value => {
+          const newValue = mapper(value);
           if (newValue !== MEMORIZED) atom(newValue);
         },
-        pub.eventType,
-        pub[COMPUTED_LEVEL],
+        combinedAtom.eventType,
+        combinedAtom[COMPUTED_LEVEL],
       );
 
       return this._omitSetterSignature(atom);
     }
 
-    combineAtoms<T: $ReadOnlyArray<Atom<*>>>(
-      // eslint-disable-next-line
-      atoms: T,
-    ): Atom<$TupleMap<T, <A>(a: A) => $Call<A>>> {
-      let maxComputedLevel = 0;
-      // eslint-disable-next-line
-      const atomsValue: $TupleMap<T, <A>(a: A) => $Call<A>> = atoms.map(
-        atom => {
-          if (!isAtom(atom)) throw new Error('Atom is not atom');
-          maxComputedLevel = Math.max(atom[COMPUTED_LEVEL], maxComputedLevel);
-          return atom();
-        },
-      );
-
-      const combinedAtom = this.createAtomPlain(atomsValue);
-
-      for (let i = 0; i < atoms.length; i++) {
-        this.subscribe(
-          newValue => {
-            const accumulator = combinedAtom().slice(0);
-            accumulator[i] = newValue;
-            combinedAtom(accumulator);
-          },
-          atoms[i].eventType,
-          maxComputedLevel,
-        );
-      }
-
-      combinedAtom[COMPUTED_LEVEL] = maxComputedLevel + 1;
-      return this._omitSetterSignature(combinedAtom);
-    }
-
-    // TODO:
-    // $off
-    createAtom<T, T1, T21, T22, T31, T32, T33, T41, T42, T43, T44>(
-      // eslint-disable-next-line
-      ...a:
-        | [T]
-        | [Atom<T1>, Function]
-        | [Atom<T21>, Atom<T22>]
-        | [Atom<T21>, Atom<T22>, Function]
-        | [Atom<T31>, Atom<T32>, Atom<T33>]
-        | [Atom<T31>, Atom<T32>, Atom<T33>, Function]
-        | [Atom<T41>, Atom<T42>, Atom<T43>, Atom<T44>, Function]
-        | [Atom<T41>, Atom<T42>, Atom<T43>, Atom<T44>]
-    ) {
-      switch (a.length) {
-        case 0:
-          throw new Error('Please, specify arguments');
-        case 1:
-          if (isAtom(a[0])) throw new Error('Please, specify mapper function');
-          // $off
-          return this.createAtomPlain<T>(a[0]);
-        case 2:
-          // $off
-          if (isAtom(a[a.length - 1])) return this.combineAtoms<[T21, T22]>(a);
-          // $off
-          return this.createAtomFrom<T1>(a[0], a[1]);
-        case 3:
-          if (isAtom(a[a.length - 1]))
-            // $off
-            return this.combineAtoms<[T31, T32, T33]>(a);
-          // $off
-          return this.createAtomFrom(
-            // $off
-            this.combineAtoms<[T31, T32]>([a[0], a[1]]),
-            // $off
-            a[2],
-          );
-        case 4:
-          if (isAtom(a[a.length - 1]))
-            // $off
-            return this.combineAtoms<[T41, T42, T43, T44]>(a);
-          // $off
-          return this.createAtomFrom(
-            // $off
-            this.combineAtoms<[T41, T42, T43]>([a[0], a[1], a[2]]),
-            // $off
-            a[3],
-          );
-        default:
-          throw new Error('flow...............');
-      }
+    createAtom<T, M: Function>(value: T, mapper?: M) {
+      return mapper === undefined
+        ? this.createAtomPlain(value)
+        : this.combineAtoms(value, mapper);
     }
   };
 }
