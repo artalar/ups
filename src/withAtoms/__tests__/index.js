@@ -1,9 +1,7 @@
 // @flow
 
-const PubSub = require('../../core');
-const withAtoms = require('../');
-
-const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
+import PubSub from '../../core';
+import withAtoms from '..';
 
 describe('atom', () => {
   it('map', () => {
@@ -11,11 +9,11 @@ describe('atom', () => {
 
     const One = createAtom('one');
     const Two = createAtom('two');
-    const Shape = createAtom([One, Two], ([one, two]) => ({ one, two }));
-    const One2 = createAtom([Shape], ([{ one }]) => one);
-    const Two2 = createAtom([Shape], ([{ two }]) => two);
+    const Shape = createAtom(One, Two, (one, two) => ({ one, two }));
+    const One2 = createAtom(Shape, ({ one }) => one);
+    const Two2 = createAtom(Shape, ({ two }) => two);
 
-    const Shape2 = createAtom([One2, Two2], ([one, two]) => ({ one, two }));
+    const Shape2 = createAtom(One2, Two2, (one, two) => ({ one, two }));
 
     const view = jest.fn();
     Shape2.subscribe(view);
@@ -33,11 +31,11 @@ describe('atom', () => {
     const a0 = createAtom(null);
     const a1 = createAtom(null);
     const a2 = createAtom(null);
-    const a01 = createAtom([a0], ([v]) => v);
-    const a02 = createAtom([a0, a1, a2], v => v);
-    const a001 = createAtom([a01], ([v]) => v);
-    const a002 = createAtom([a01, a02], v => v);
-    const a0001 = createAtom([a001, a002], v => v);
+    const a01 = createAtom(a0, v => v);
+    const a02 = createAtom(a0, a1, a2, (...v) => v);
+    const a001 = createAtom(a01, v => v);
+    const a002 = createAtom(a01, a02, (...v) => v);
+    const a0001 = createAtom(a001, a002, (...v) => v);
 
     a0001.subscribe(cb);
 

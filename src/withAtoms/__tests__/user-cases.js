@@ -1,8 +1,8 @@
 /* eslint-disable */
 // @flow
 
-const PubSub = require('../../core');
-const withAtoms = require('../');
+import PubSub from '../../core';
+import withAtoms from '../';
 
 const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
@@ -13,13 +13,12 @@ describe('user-cases', () => {
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
 
-    const FullName = createAtom([FirstName, LastName], names =>
-      names.join(' '),
+    const FullName = createAtom(FirstName, LastName, (fn, ln) =>
+      [fn, ln].join(' '),
     );
 
-    const DisplayName = createAtom(
-      [FirstName, FullName],
-      ([firstName, fullName]) => (firstName.length < 10 ? fullName : firstName),
+    const DisplayName = createAtom(FirstName, FullName, (firstName, fullName) =>
+      firstName.length < 10 ? fullName : firstName,
     );
 
     const view = jest.fn();
@@ -38,10 +37,9 @@ describe('user-cases', () => {
     const { createAtom } = new (withAtoms(PubSub))();
     const memoize = map => {
       let lastValue;
-      return v => {
-        const newValue = map(v);
-        if (lastValue === newValue) return MEMORIZED;
-        else return (lastValue = newValue);
+      return (...v) => {
+        const newValue = map(...v);
+        return lastValue === newValue ? MEMORIZED : (lastValue = newValue);
       };
     };
 
@@ -50,13 +48,14 @@ describe('user-cases', () => {
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
 
-    const FullName = createAtom([FirstName, LastName], names =>
-      names.join(' '),
+    const FullName = createAtom(FirstName, LastName, (fn, ln) =>
+      [fn, ln].join(' '),
     );
 
     const DisplayName = createAtom(
-      [FirstName, FullName],
-      memoize(([firstName, fullName]) =>
+      FirstName,
+      FullName,
+      memoize((firstName, fullName) =>
         firstName.length < 10 ? fullName : firstName,
       ),
     );
@@ -85,17 +84,19 @@ describe('user-cases', () => {
     const FirstName = createAtom('John');
     const LastName = createAtom('Doe');
 
-    const isFirstNameShortMap = jest.fn(([v]) => v.length < 10);
-    const IsFirstNameShort = createAtom([FirstName], isFirstNameShortMap);
+    const isFirstNameShortMap = jest.fn(v => v.length < 10);
+    const IsFirstNameShort = createAtom(FirstName, isFirstNameShortMap);
 
-    const fullNameMap = jest.fn(names => names.join(' '));
-    const FullName = createAtom([FirstName, LastName], fullNameMap);
+    const fullNameMap = jest.fn((fn, ln) => [fn, ln].join(' '));
+    const FullName = createAtom(FirstName, LastName, fullNameMap);
 
-    const displayNameMap = jest.fn(([firstName, isFirstNameShort, fullName]) =>
+    const displayNameMap = jest.fn((firstName, isFirstNameShort, fullName) =>
       isFirstNameShort ? fullName : firstName,
     );
     const DisplayName = createAtom(
-      [FirstName, IsFirstNameShort, FullName],
+      FirstName,
+      IsFirstNameShort,
+      FullName,
       displayNameMap,
     );
 
@@ -138,22 +139,21 @@ describe('user-cases', () => {
       }
     }
 
-    const Status = createAtom({
+    const initialStatus: { status: string, data?: number[], error?: null } = {
       status: 'idle',
-    });
+    };
 
-    const Data = createAtom([Status], ([{ status, data }]) =>
+    const Status = createAtom(initialStatus);
+
+    const Data = createAtom(Status, ({ status, data }) =>
       status === 'res' ? data : [],
     );
 
-    const ErrorStatus = createAtom([Status], ([{ status, error }]) =>
+    const ErrorStatus = createAtom(Status, ({ status, error }) =>
       status === 'err' ? error : null,
     );
 
-    const Feature = createAtom(
-      { status: Status, data: Data, error: ErrorStatus },
-      v => v,
-    );
+    const Feature = createAtom(Status, Data, ErrorStatus, (...v) => v);
 
     Feature.subscribe(data => {
       expect(data).toBe(Feature());
@@ -166,15 +166,11 @@ describe('user-cases', () => {
     expect(Status().status).toEqual('res');
     expect(ErrorStatus()).toBe(null);
     expect(cb.mock.calls.length).toBe(2);
-    expect(cb.mock.calls[0][0]).toEqual({
-      status: { status: 'req' },
-      data: [],
-      error: null,
-    });
-    expect(cb.mock.calls[1][0]).toEqual({
-      status: { status: 'res', data: [1, 2, 3] },
-      data: [1, 2, 3],
-      error: null,
-    });
+    expect(cb.mock.calls[0][0]).toEqual([{ status: 'req' }, [], null]);
+    expect(cb.mock.calls[1][0]).toEqual([
+      { status: 'res', data: [1, 2, 3] },
+      [1, 2, 3],
+      null,
+    ]);
   });
 });

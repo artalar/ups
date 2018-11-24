@@ -1,0 +1,72 @@
+// eslint-disable-next-line1
+
+// @flow
+
+import PubSub from '../core';
+
+type Atom<T> = {
+  (newState?: T): T,
+  eventType: string,
+  subscribe: (cb: (state: T) => *) => () => void,
+};
+
+declare function combineAtoms<A, State>(
+  a: Atom<A>,
+  mapper: (a: A) => State,
+): Atom<State>;
+declare function combineAtoms<A1, A2, State>(
+  a1: Atom<A1>,
+  a2: Atom<A2>,
+  mapper: (a1: A1, a2: A2) => State,
+): Atom<State>;
+declare function combineAtoms<A1, A2, A3, State>(
+  a1: Atom<A1>,
+  a2: Atom<A2>,
+  a3: Atom<A3>,
+  mapper: (a1: A1, a2: A2, a3: A3) => State,
+): Atom<State>;
+declare function combineAtoms<A1, A2, A3, A4, State>(
+  a1: Atom<A1>,
+  a2: Atom<A2>,
+  a3: Atom<A3>,
+  a4: Atom<A4>,
+  mapper: (a1: A1, a2: A2, a3: A3, a4: A4) => State,
+): Atom<State>;
+
+declare function createAtom<State>(value: State): Atom<State>;
+declare function createAtom<A, State>(
+  a: Atom<A>,
+  mapper: (a: A) => State,
+): Atom<State>;
+declare function createAtom<A1, A2, State>(
+  a1: Atom<A1>,
+  a2: Atom<A2>,
+  mapper: (a1: A1, a2: A2) => State,
+): Atom<State>;
+declare function createAtom<A1, A2, A3, State>(
+  a1: Atom<A1>,
+  a2: Atom<A2>,
+  a3: Atom<A3>,
+  mapper: (a1: A1, a2: A2, a3: A3) => State,
+): Atom<State>;
+declare function createAtom<A1, A2, A3, A4, State>(
+  a1: Atom<A1>,
+  a2: Atom<A2>,
+  a3: Atom<A3>,
+  a4: Atom<A4>,
+  mapper: (a1: A1, a2: A2, a3: A3, a4: A4) => State,
+): Atom<State>;
+
+declare class PubSubWithAtoms extends PubSub {
+  constructor(title?: string): void;
+
+  createAtomPlain: <State>(initialState: State) => Atom<State>;
+
+  combineAtoms: typeof combineAtoms;
+
+  createAtom: typeof createAtom;
+}
+
+declare export default function withAtoms(
+  pb: typeof PubSub,
+): typeof PubSubWithAtoms;
