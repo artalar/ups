@@ -1,33 +1,42 @@
-// @flow
-import PubSubType from '../core';
+export const PUBLISH_LEVEL = '@@UPS/withLogging/PUBLISH_LEVEL';
 
-function withLogging(PubSub: typeof PubSubType) {
+function publish(eventsProperties, payloads) {
+  if (eventsProperties === undefined) return;
+
+  eventsProperties.subscribers.forEach(subscriber => subscriber(payloads));
+}
+
+export default function withLogging(PubSub) {
   return class PubSubWithLogging extends PubSub {
-    _publish() {
-      super._publish();
-      const payloads = this._payloads;
-      const eventsProperties = this._eventsProperties[this._title];
-      if (eventsProperties !== undefined) {
-        eventsProperties.subscribers.forEach(subscriber =>
-          subscriber(payloads),
-        );
-      }
+    constructor(...a) {
+      super(...a);
+      this[PUBLISH_LEVEL] = 0;
     }
 
-    subscribe(listener: Function, eventType?: string, priorityIndex?: number) {
+    _publish() {
+      this[PUBLISH_LEVEL]--;
+      super._publish();
+      publish(this._eventsProperties[this._title], this._payloads);
+    }
+
+    subscribe(listener, eventType, priorityIndex) {
       if (eventType === undefined) {
         eventType = this._title;
       }
       return super.subscribe(listener, eventType, priorityIndex);
     }
 
-    dispatch(eventType: string, payload?: mixed) {
+    dispatch(eventType, payload) {
       if (eventType === this._title) {
-        throw new Error('Can not dispatch directly to dispatcher');
+        throw new Error('@@UPS: Can not dispatch directly to dispatcher');
       }
-      return super.dispatch(eventType, payload);
+
+      const publishLevel = this[PUBLISH_LEVEL]++;
+      super.dispatch(eventType, payload);
+      if (publishLevel !== this[PUBLISH_LEVEL]) {
+        this[PUBLISH_LEVEL]--;
+        publish(this._eventsProperties[this._title], { [eventType]: payload });
+      }
     }
   };
 }
-
-module.exports = withLogging;

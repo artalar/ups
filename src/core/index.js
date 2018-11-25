@@ -1,7 +1,7 @@
 // @flow
 
 type EventProperties = {
-  payload?: mixed,
+  payload?: *,
   prioritySubscribers: { [string | number]: Set<Function> },
   subscribers: Set<Function>,
 };
@@ -16,7 +16,7 @@ class PubSub {
     }
     _isPublishing: boolean
     _startOver: boolean
-    _payloads: { [string]: mixed }
+    _payloads: { [string]: * }
   */
   constructor(title?: string) {
     this._title = `@@UPS/${title || 'CORE'}`;
@@ -27,9 +27,8 @@ class PubSub {
     this._startOver = false;
   }
 
-  // `Set` can be replaced by simplest `Set` polyfill
-  // `{ add(cb){ this._list.push(cb) ... } }`
-  // for old browsers
+  // For old browsers `Set` can be replaced by minimal `Set` polyfill
+  // required methods: `{ add(){} delete(){} size: number }`
   _createQueue(): Set<string> {
     return new Set();
   }
@@ -50,36 +49,34 @@ class PubSub {
           isLastQueue = priorityQueueIndex === priorityQueues.length
       ) {
         this._startOver = false;
-        let eventTypes;
 
-        if (isLastQueue) {
-          eventTypes = this._finalQueue;
-          this._finalQueue = this._createQueue();
-        } else {
-          eventTypes = priorityQueues[priorityQueueIndex];
-          priorityQueues[priorityQueueIndex] = this._createQueue();
-        }
+        const eventTypes = isLastQueue
+          ? this._finalQueue
+          : priorityQueues[priorityQueueIndex];
+        if (eventTypes.size === 0) continue;
+        if (isLastQueue) this._finalQueue = this._createQueue();
+        else priorityQueues[priorityQueueIndex] = this._createQueue();
 
-        if (eventTypes.size !== 0) {
-          eventTypes.forEach(eventType => {
-            const eventsProperties = this._eventsProperties[eventType];
+        eventTypes.forEach(eventType => {
+          const eventsProperties = this._eventsProperties[eventType];
+          // was unsubscribes at the time of dispatching
+          if (eventsProperties === undefined) return;
 
-            const subscribers = isLastQueue
-              ? eventsProperties.subscribers
-              : eventsProperties.prioritySubscribers[priorityQueueIndex];
+          const subscribers = isLastQueue
+            ? eventsProperties.subscribers
+            : eventsProperties.prioritySubscribers[priorityQueueIndex];
 
-            if ('payload' in eventsProperties) {
-              this._payloads[eventType] = eventsProperties.payload;
-              delete eventsProperties.payload;
-            }
+          if (subscribers === undefined || subscribers.size === 0) return;
 
-            const value = this._payloads[eventType];
+          if ('payload' in eventsProperties) {
+            this._payloads[eventType] = eventsProperties.payload;
+            delete eventsProperties.payload;
+          }
 
-            if (subscribers === undefined) return;
+          const value = this._payloads[eventType];
 
-            subscribers.forEach(subscriber => subscriber(value));
-          });
-        }
+          subscribers.forEach(subscriber => subscriber(value));
+        });
 
         if (this._startOver) {
           priorityQueueIndex = -1;
@@ -100,9 +97,10 @@ class PubSub {
         if (e instanceof Error) throw e;
         if (typeof e === 'string') throw new Error(e);
         const error = new Error(
-          '@@UPS/ error when notifying subscribers.' +
+          '@@UPS: error when notifying subscribers.' +
             '\nSee error data in `data` property of this Error instance',
         );
+        // $off
         error.data = e;
         throw error;
       }
@@ -121,10 +119,32 @@ class PubSub {
     };
   }
 
-  _bindSubscriber(subscribers: Set<Function>, listener: Function) {
+  _bindSubscriber(
+    subscribers: Set<Function>,
+    listener: Function,
+    eventType: string,
+    eventsProperties: { [string]: EventProperties },
+  ) {
     subscribers.add(listener);
+    const eventProperties = eventsProperties[eventType];
+    const { prioritySubscribers } = eventProperties;
     return function unsubscribe() {
       subscribers.delete(listener);
+      if (eventProperties.subscribers.size !== 0) return;
+      const keys = Object.keys(prioritySubscribers);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (prioritySubscribers[key] !== undefined) {
+          if (prioritySubscribers[key].size === 0) {
+            delete prioritySubscribers[key];
+          } else {
+            return;
+          }
+        }
+      }
+      // there is no one subscriber, we don't need eventProperties
+      // for prevent empty dispatch
+      delete eventsProperties[eventType];
     };
   }
 
@@ -134,10 +154,14 @@ class PubSub {
     priorityIndex?: number,
   ): () => void {
     if (typeof listener !== 'function') {
-      throw new TypeError('Expected the listener to be a function.');
+      throw new TypeError(
+        `@@UPS: expected the listener to be a function, but got: ${typeof listener}.`,
+      );
     }
     if (typeof eventType !== 'string') {
-      throw new TypeError('Expected the eventType to be a string.');
+      throw new TypeError(
+        `@@UPS: expected the eventType to be a string, but got: ${typeof eventType}.`,
+      );
     }
 
     const priorityQueuesLength = this._priorityQueues.length;
@@ -145,38 +169,46 @@ class PubSub {
       this._eventsProperties[eventType] ||
       (this._eventsProperties[eventType] = this._createEventProperties());
 
-    // "reaction" subscriber
+    // `this._finalQueue`
     if (priorityIndex === undefined) {
-      return this._bindSubscriber(eventProperties.subscribers, listener);
+      return this._bindSubscriber(
+        eventProperties.subscribers,
+        listener,
+        eventType,
+        this._eventsProperties,
+      );
     }
 
+    // `this._priorityQueues`
     if (priorityQueuesLength < priorityIndex) {
       throw new Error(
-        'Unexpected "priorityIndex" amount. ' +
+        '@@UPS: too big "priorityIndex". ' +
           `Current: ${priorityQueuesLength}, requested: ${priorityIndex}`,
       );
     }
     if (priorityQueuesLength === priorityIndex) {
       this._priorityQueues.push(this._createQueue());
     }
-
-    if (!eventProperties.prioritySubscribers[priorityIndex]) {
-      eventProperties.prioritySubscribers[
-        priorityIndex
-      ] = this._createSubscribers();
-    }
-    const subscribers = eventProperties.prioritySubscribers[priorityIndex];
-
-    return this._bindSubscriber(subscribers, listener);
+    return this._bindSubscriber(
+      // prettier-ignore
+      eventProperties.prioritySubscribers[priorityIndex] ||
+        (eventProperties.prioritySubscribers[priorityIndex] = this._createSubscribers()),
+      listener,
+      eventType,
+      this._eventsProperties,
+    );
   }
 
-  dispatch(eventType: string, payload?: mixed) {
+  dispatch(eventType: string, payload?: *) {
     if (typeof eventType !== 'string') {
-      throw new TypeError('Expected the eventType to be a string.');
+      throw new TypeError(
+        `@@UPS: expected the eventType to be a string, but got: ${typeof eventType}.`,
+      );
     }
 
     const eventProperties = this._eventsProperties[eventType];
 
+    // No one has subscribe for the event yet
     if (eventProperties === undefined) return;
 
     eventProperties.payload = payload;

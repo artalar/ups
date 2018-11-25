@@ -1,0 +1,17 @@
+// @flow
+
+import PubSub from '../core';
+
+class PubSubWithLogging extends PubSub {
+  subscribe: (
+    listener: Function,
+    // if `eventType` is not set
+    // the listener will subscribed to all events
+    eventType?: string,
+    priorityIndex?: number,
+  ) => () => void;
+}
+
+declare export default function withLogging(
+  PB: typeof PubSub,
+): typeof PubSubWithLogging;

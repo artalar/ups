@@ -2,7 +2,8 @@
 // @flow
 
 import PubSub from '../../core';
-import withAtoms from '../';
+import withAtoms from '..';
+import type { Atom } from '..';
 
 const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
@@ -33,7 +34,7 @@ describe('user-cases', () => {
     expect(view.mock.calls.length).toBe(2);
   });
 
-  it('rhombus memorized map', () => {
+  it('rhombus memorized', () => {
     const { createAtom } = new (withAtoms(PubSub))();
     const memoize = map => {
       let lastValue;
@@ -130,20 +131,24 @@ describe('user-cases', () => {
     const { createAtom } = new (withAtoms(PubSub))();
     const cb = jest.fn();
 
-    async function updateUser(fetcher) {
-      Status({ status: 'req' });
-      try {
-        Status({ status: 'res', data: await fetcher() });
-      } catch (error) {
-        Status({ status: 'err', error });
-      }
-    }
-
-    const initialStatus: { status: string, data?: number[], error?: null } = {
+    const Status: Atom<
+      | {|
+          status: 'idle',
+        |}
+      | {|
+          status: 'req',
+        |}
+      | {|
+          status: 'res',
+          data: number[],
+        |}
+      | {|
+          status: 'err',
+          error: Error,
+        |},
+    > = createAtom({
       status: 'idle',
-    };
-
-    const Status = createAtom(initialStatus);
+    });
 
     const Data = createAtom(Status, ({ status, data }) =>
       status === 'res' ? data : [],
@@ -160,6 +165,15 @@ describe('user-cases', () => {
       cb(data);
     });
 
+    async function updateUser(fetcher) {
+      Status({ status: 'req' });
+      try {
+        Status({ status: 'res', data: await fetcher() });
+      } catch (error) {
+        Status({ status: 'err', error });
+      }
+    }
+
     await updateUser(() => new Promise(r => setTimeout(r, 50, [1, 2, 3])));
 
     expect(Data()).toEqual([1, 2, 3]);
@@ -173,4 +187,6 @@ describe('user-cases', () => {
       null,
     ]);
   });
+
+  it('async1', () => {});
 });

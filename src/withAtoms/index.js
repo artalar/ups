@@ -50,7 +50,7 @@ function withAtoms(PubSub) {
     _omitSetterSignature(originalAtom) {
       function atom() {
         if (arguments.length === 0) return originalAtom();
-        throw new TypeError('Combined atom can not set the value');
+        throw new TypeError('@@UPS: combined atom can not be setter');
       }
       return Object.assign(atom, originalAtom);
     }
@@ -83,7 +83,7 @@ function withAtoms(PubSub) {
       let maxComputedLevel = 0;
       const atomsValue = atoms.map((atom, i) => {
         if (!isAtom(atom)) {
-          throw new Error(`Argument №${i} is not atom`);
+          throw new Error(`@@UPS: argument №${i} is not atom`);
         }
         maxComputedLevel = Math.max(atom[COMPUTED_LEVEL], maxComputedLevel);
         return atom();

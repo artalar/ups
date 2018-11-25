@@ -1,10 +1,10 @@
-// eslint-disable-next-line1
+/* eslint-disable */
 
 // @flow
 
 import PubSub from '../core';
 
-type Atom<T> = {
+export type Atom<T> = {
   (newState?: T): T,
   eventType: string,
   subscribe: (cb: (state: T) => *) => () => void,
@@ -68,5 +68,5 @@ declare class PubSubWithAtoms extends PubSub {
 }
 
 declare export default function withAtoms(
-  pb: typeof PubSub,
+  PB: typeof PubSub,
 ): typeof PubSubWithAtoms;

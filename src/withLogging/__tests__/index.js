@@ -1,7 +1,7 @@
 // @flow
 
-const PubSub = require('../../core');
-const withLogging = require('../');
+import PubSub from '../../core';
+import withLogging from '..';
 
 describe('withLogging', () => {
   describe('log', () => {
@@ -29,14 +29,14 @@ describe('withLogging', () => {
     pb.dispatch(EVENT_TYPE_UNEXIST, null);
 
     it('all logs', () => {
-      expect(cbLog.mock.calls.length).toBe(3);
+      expect(cbLog.mock.calls.length).toBe(4);
       expect(log).toEqual([
-        { EVENT_TYPE: undefined },
-        { EVENT_TYPE: true },
+        { [EVENT_TYPE]: undefined },
+        { [EVENT_TYPE]: true },
         // TODO: do we need publish events without subscribers?
-        { EVENT_TYPE: false },
+        { [EVENT_TYPE]: false },
         // TODO: do we need logs unexist (without subscribers) event?
-        // { EVENT_TYPE_UNEXIST: null },
+        { EVENT_TYPE_UNEXIST: null },
       ]);
     });
 
@@ -48,7 +48,9 @@ describe('withLogging', () => {
         error = e;
       }
       expect(error).toBeInstanceOf(Error);
-      expect(error.message).toBe('Can not dispatch directly to dispatcher');
+      expect(error.message).toBe(
+        '@@UPS: Can not dispatch directly to dispatcher',
+      );
     });
   });
 });
