@@ -70,7 +70,7 @@ describe('core', () => {
       }
 
       expect(error).toBeInstanceOf(Error);
-      expect(error.message).toBe(tag);
+      expect(error && error.message).toBe(tag);
 
       error = null;
 
@@ -80,7 +80,7 @@ describe('core', () => {
         error = e;
       }
       expect(error).toBeInstanceOf(Error);
-      expect(error.message).toBe(tag);
+      expect(error && error.message).toBe(tag);
 
       expect(cb1.mock.calls.length).toBe(calls.cb1);
       expect(cb2.mock.calls.length).toBe(calls.cb2);
