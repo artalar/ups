@@ -9,16 +9,16 @@ const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
 describe('user-cases', () => {
   it('rhombus', () => {
-    const { createAtom } = new (withAtoms(PubSub))();
+    const { multiAtom } = new (withAtoms(PubSub))();
 
-    const FirstName = createAtom('John');
-    const LastName = createAtom('Doe');
+    const FirstName = multiAtom('John');
+    const LastName = multiAtom('Doe');
 
-    const FullName = createAtom(FirstName, LastName, (fn, ln) =>
+    const FullName = multiAtom(FirstName, LastName, (fn, ln) =>
       [fn, ln].join(' '),
     );
 
-    const DisplayName = createAtom(FirstName, FullName, (firstName, fullName) =>
+    const DisplayName = multiAtom(FirstName, FullName, (firstName, fullName) =>
       firstName.length < 10 ? fullName : firstName,
     );
 
@@ -35,7 +35,7 @@ describe('user-cases', () => {
   });
 
   it('rhombus memorized', () => {
-    const { createAtom } = new (withAtoms(PubSub))();
+    const { multiAtom } = new (withAtoms(PubSub))();
     const memoize = map => {
       let lastValue;
       return (...v) => {
@@ -45,15 +45,15 @@ describe('user-cases', () => {
     };
 
     // TODO: shortcut for
-    // `const FirstName = createAtom("John", memoize(v => v));`
-    const FirstName = createAtom('John');
-    const LastName = createAtom('Doe');
+    // `const FirstName = multiAtom("John", memoize(v => v));`
+    const FirstName = multiAtom('John');
+    const LastName = multiAtom('Doe');
 
-    const FullName = createAtom(FirstName, LastName, (fn, ln) =>
+    const FullName = multiAtom(FirstName, LastName, (fn, ln) =>
       [fn, ln].join(' '),
     );
 
-    const DisplayName = createAtom(
+    const DisplayName = multiAtom(
       FirstName,
       FullName,
       memoize((firstName, fullName) =>
@@ -80,21 +80,21 @@ describe('user-cases', () => {
   });
 
   it('rhombus detailed', () => {
-    const { createAtom } = new (withAtoms(PubSub))();
+    const { multiAtom } = new (withAtoms(PubSub))();
 
-    const FirstName = createAtom('John');
-    const LastName = createAtom('Doe');
+    const FirstName = multiAtom('John');
+    const LastName = multiAtom('Doe');
 
     const isFirstNameShortMap = jest.fn(v => v.length < 10);
-    const IsFirstNameShort = createAtom(FirstName, isFirstNameShortMap);
+    const IsFirstNameShort = multiAtom(FirstName, isFirstNameShortMap);
 
     const fullNameMap = jest.fn((fn, ln) => [fn, ln].join(' '));
-    const FullName = createAtom(FirstName, LastName, fullNameMap);
+    const FullName = multiAtom(FirstName, LastName, fullNameMap);
 
     const displayNameMap = jest.fn((firstName, isFirstNameShort, fullName) =>
       isFirstNameShort ? fullName : firstName,
     );
-    const DisplayName = createAtom(
+    const DisplayName = multiAtom(
       FirstName,
       IsFirstNameShort,
       FullName,
@@ -128,7 +128,7 @@ describe('user-cases', () => {
   });
 
   it('async', async () => {
-    const { createAtom } = new (withAtoms(PubSub))();
+    const { multiAtom } = new (withAtoms(PubSub))();
     const cb = jest.fn();
 
     const Status: Atom<
@@ -146,19 +146,19 @@ describe('user-cases', () => {
           status: 'err',
           error: Error,
         |},
-    > = createAtom({
+    > = multiAtom({
       status: 'idle',
     });
 
-    const Data = createAtom(Status, ({ status, data }) =>
-      status === 'res' ? data : [],
+    const Data = Status.map(payload =>
+      payload.status === 'res' ? payload.data : [],
     );
 
-    const ErrorStatus = createAtom(Status, ({ status, error }) =>
-      status === 'err' ? error : null,
+    const ErrorStatus = Status.map(payload =>
+      payload.status === 'err' ? payload.error : null,
     );
 
-    const Feature = createAtom(Status, Data, ErrorStatus, (...v) => v);
+    const Feature = multiAtom(Status, Data, ErrorStatus, (...v) => v);
 
     Feature.subscribe(data => {
       expect(data).toBe(Feature());

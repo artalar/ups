@@ -5,15 +5,15 @@ import withAtoms from '..';
 
 describe('atom', () => {
   it('map', () => {
-    const { createAtom } = new (withAtoms(PubSub))();
+    const { multiAtom } = new (withAtoms(PubSub))();
 
-    const One = createAtom('one');
-    const Two = createAtom('two');
-    const Shape = createAtom(One, Two, (one, two) => ({ one, two }));
-    const One2 = createAtom(Shape, ({ one }) => one);
-    const Two2 = createAtom(Shape, ({ two }) => two);
+    const One = multiAtom('one');
+    const Two = multiAtom('two');
+    const Shape = multiAtom(One, Two, (one, two) => ({ one, two }));
+    const One2 = multiAtom(Shape, ({ one }) => one);
+    const Two2 = multiAtom(Shape, ({ two }) => two);
 
-    const Shape2 = createAtom(One2, Two2, (one, two) => ({ one, two }));
+    const Shape2 = multiAtom(One2, Two2, (one, two) => ({ one, two }));
 
     const view = jest.fn();
     Shape2.subscribe(view);
@@ -26,16 +26,16 @@ describe('atom', () => {
   it('deep structure', () => {
     const cb = jest.fn();
 
-    const { createAtom } = new (withAtoms(PubSub))();
+    const { multiAtom } = new (withAtoms(PubSub))();
 
-    const a0 = createAtom(null);
-    const a1 = createAtom(null);
-    const a2 = createAtom(null);
-    const a01 = createAtom(a0, v => v);
-    const a02 = createAtom(a0, a1, a2, (...v) => v);
-    const a001 = createAtom(a01, v => v);
-    const a002 = createAtom(a01, a02, (...v) => v);
-    const a0001 = createAtom(a001, a002, (...v) => v);
+    const a0 = multiAtom(null);
+    const a1 = multiAtom(null);
+    const a2 = multiAtom(null);
+    const a01 = multiAtom(a0, v => v);
+    const a02 = multiAtom(a0, a1, a2, (...v) => v);
+    const a001 = multiAtom(a01, v => v);
+    const a002 = multiAtom(a01, a02, (...v) => v);
+    const a0001 = multiAtom(a001, a002, (...v) => v);
 
     a0001.subscribe(cb);
 

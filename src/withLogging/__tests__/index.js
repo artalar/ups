@@ -48,7 +48,7 @@ describe('withLogging', () => {
         error = e;
       }
       expect(error).toBeInstanceOf(Error);
-      expect(error.message).toBe(
+      expect(error && error.message).toBe(
         '@@UPS: Can not dispatch directly to dispatcher',
       );
     });

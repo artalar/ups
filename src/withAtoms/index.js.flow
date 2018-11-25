@@ -4,10 +4,14 @@
 
 import PubSub from '../core';
 
-export type Atom<T> = {
-  (newState?: T): T,
+export type Atom<State> = {
+  (newState?: State): State,
   eventType: string,
-  subscribe: (cb: (state: T) => *) => () => void,
+  map: <NewState>(
+    mapper: (state: State) => NewState,
+    description?: string,
+  ) => Atom<NewState>,
+  subscribe: (cb: (state: State) => *) => () => void,
 };
 
 declare function combineAtoms<A, State>(
@@ -33,23 +37,23 @@ declare function combineAtoms<A1, A2, A3, A4, State>(
   mapper: (a1: A1, a2: A2, a3: A3, a4: A4) => State,
 ): Atom<State>;
 
-declare function createAtom<State>(value: State): Atom<State>;
-declare function createAtom<A, State>(
+declare function multiAtom<State>(value: State): Atom<State>;
+declare function multiAtom<A, State>(
   a: Atom<A>,
   mapper: (a: A) => State,
 ): Atom<State>;
-declare function createAtom<A1, A2, State>(
+declare function multiAtom<A1, A2, State>(
   a1: Atom<A1>,
   a2: Atom<A2>,
   mapper: (a1: A1, a2: A2) => State,
 ): Atom<State>;
-declare function createAtom<A1, A2, A3, State>(
+declare function multiAtom<A1, A2, A3, State>(
   a1: Atom<A1>,
   a2: Atom<A2>,
   a3: Atom<A3>,
   mapper: (a1: A1, a2: A2, a3: A3) => State,
 ): Atom<State>;
-declare function createAtom<A1, A2, A3, A4, State>(
+declare function multiAtom<A1, A2, A3, A4, State>(
   a1: Atom<A1>,
   a2: Atom<A2>,
   a3: Atom<A3>,
@@ -60,11 +64,14 @@ declare function createAtom<A1, A2, A3, A4, State>(
 declare class PubSubWithAtoms extends PubSub {
   constructor(title?: string): void;
 
-  createAtomPlain: <State>(initialState: State) => Atom<State>;
+  createAtom: <State>(
+    initialState: State,
+    descriptions?: string,
+  ) => Atom<State>;
 
   combineAtoms: typeof combineAtoms;
 
-  createAtom: typeof createAtom;
+  multiAtom: typeof multiAtom;
 }
 
 declare export default function withAtoms(
