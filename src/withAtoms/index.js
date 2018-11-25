@@ -2,7 +2,8 @@ const IS_ATOM = '@@UPS/ATOM/IS_ATOM';
 const COMPUTED_LEVEL = '@@UPS/ATOM/COMPUTED_LEVEL';
 const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
-function getStack() {
+// FIXME: replace
+function getCaller() {
   // Save original Error.prepareStackTrace
   const origPrepareStackTrace = Error.prepareStackTrace;
 
@@ -16,20 +17,13 @@ function getStack() {
   // Restore original `Error.prepareStackTrace`
   Error.prepareStackTrace = origPrepareStackTrace;
 
+  if (!Array.isArray(stack)) return '';
+
   // Remove superfluous function call on stack
-  stack.shift(); // getStack --> Error
-
-  return stack;
-}
-
-function getCaller() {
-  const stack = getStack();
-
-  stack.shift(); // getStack
-  stack.shift(); // getCaller
-
+  // Error
+  // getCaller
   // Return caller's caller
-  return stack;
+  return stack[2];
 }
 
 function isAtom(atom) {
@@ -42,9 +36,9 @@ function withAtoms(PubSub) {
       super(...a);
 
       this._atomsCount = 0;
-      this.createAtomPlain = this.createAtomPlain.bind(this);
-      this.combineAtoms = this.combineAtoms.bind(this);
       this.createAtom = this.createAtom.bind(this);
+      this.combineAtoms = this.combineAtoms.bind(this);
+      this.multiAtom = this.multiAtom.bind(this);
     }
 
     _omitSetterSignature(originalAtom) {
@@ -55,7 +49,7 @@ function withAtoms(PubSub) {
       return Object.assign(atom, originalAtom);
     }
 
-    createAtomPlain(initialState, description = getCaller()[0]) {
+    createAtom(initialState, description = getCaller()) {
       let state = initialState;
 
       function atom(newState?) {
@@ -65,9 +59,30 @@ function withAtoms(PubSub) {
         }
         return state;
       }
+      // eslint-disable-next-line no-func-assign
       atom = atom.bind(this);
 
       atom.eventType = `@@UPS/ATOM/[${++this._atomsCount}] ${description}`;
+
+      atom.map = function map(mapper, computedAtomDescription) {
+        const computedAtom = this.createAtom(
+          mapper(atom()),
+          computedAtomDescription,
+        );
+
+        computedAtom[COMPUTED_LEVEL] = atom[COMPUTED_LEVEL] + 1;
+
+        this.subscribe(
+          value => {
+            const newValue = mapper(value);
+            if (newValue !== MEMORIZED) computedAtom(newValue);
+          },
+          atom.eventType,
+          atom[COMPUTED_LEVEL],
+        );
+
+        return this._omitSetterSignature(computedAtom);
+      }.bind(this);
 
       atom.subscribe = cb => this.subscribe(cb, atom.eventType);
 
@@ -89,7 +104,7 @@ function withAtoms(PubSub) {
         return atom();
       });
 
-      const combinedAtom = this.createAtomPlain(atomsValue);
+      const combinedAtom = this.createAtom(atomsValue);
 
       combinedAtom[COMPUTED_LEVEL] = maxComputedLevel + 1;
 
@@ -106,26 +121,11 @@ function withAtoms(PubSub) {
         );
       }
 
-      const atom = this.createAtomPlain(mapper(...combinedAtom()));
-
-      atom[COMPUTED_LEVEL] = combinedAtom[COMPUTED_LEVEL] + 1;
-
-      this.subscribe(
-        value => {
-          const newValue = mapper(...value);
-          if (newValue !== MEMORIZED) atom(newValue);
-        },
-        combinedAtom.eventType,
-        combinedAtom[COMPUTED_LEVEL],
-      );
-
-      return this._omitSetterSignature(atom);
+      return combinedAtom.map(value => mapper(...value));
     }
 
-    createAtom(...a) {
-      return a.length === 1
-        ? this.createAtomPlain(a[0])
-        : this.combineAtoms(...a);
+    multiAtom(...a) {
+      return a.length === 1 ? this.createAtom(a[0]) : this.combineAtoms(...a);
     }
   };
 }
