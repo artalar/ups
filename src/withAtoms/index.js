@@ -94,7 +94,7 @@ function withAtoms(PubSub) {
 
     // TODO: GC
     combineAtoms(...atoms) {
-      const mapper = atoms.splice(-1)[0];
+      const mapper = atoms.pop();
       let maxComputedLevel = 0;
       const atomsValue = atoms.map((atom, i) => {
         if (!isAtom(atom)) {
