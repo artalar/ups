@@ -44,8 +44,6 @@ describe('user-cases', () => {
       );
     }
 
-    // TODO: shortcut for
-    // `const FirstName = multiAtom("John", memoize(v => v));`
     const FirstName = multiAtom('John');
     const LastName = multiAtom('Doe');
 
