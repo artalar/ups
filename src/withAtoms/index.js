@@ -112,7 +112,7 @@ function withAtoms(PubSub) {
         this.subscribe(
           // eslint-disable-next-line
           newValue => {
-            const accumulator = combinedAtom().slice(0);
+            const accumulator = combinedAtom();
             accumulator[i] = newValue;
             combinedAtom(accumulator);
           },
