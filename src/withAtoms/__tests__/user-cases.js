@@ -36,13 +36,13 @@ describe('user-cases', () => {
 
   it('rhombus memorized', () => {
     const { multiAtom } = new (withAtoms(PubSub))();
-    const memoize = map => {
+
+    function memo(atom) {
       let lastValue;
-      return (...v) => {
-        const newValue = map(...v);
-        return lastValue === newValue ? MEMORIZED : (lastValue = newValue);
-      };
-    };
+      return atom.filter(value =>
+        value === lastValue ? false : ((lastValue = value), true),
+      );
+    }
 
     // TODO: shortcut for
     // `const FirstName = multiAtom("John", memoize(v => v));`
@@ -53,10 +53,8 @@ describe('user-cases', () => {
       [fn, ln].join(' '),
     );
 
-    const DisplayName = multiAtom(
-      FirstName,
-      FullName,
-      memoize((firstName, fullName) =>
+    const DisplayName = memo(
+      multiAtom(FirstName, FullName, (firstName, fullName) =>
         firstName.length < 10 ? fullName : firstName,
       ),
     );

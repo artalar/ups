@@ -84,6 +84,13 @@ function withAtoms(PubSub) {
         return this._omitSetterSignature(computedAtom);
       }.bind(this);
 
+      atom.filter = function filter(predicate, computedAtomDescription) {
+        return atom.map(
+          value => (predicate(value) === true ? value : MEMORIZED),
+          computedAtomDescription,
+        );
+      };
+
       atom.subscribe = cb => this.subscribe(cb, atom.eventType);
 
       atom[IS_ATOM] = true;

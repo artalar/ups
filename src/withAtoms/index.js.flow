@@ -11,6 +11,10 @@ export type Atom<State> = {
     mapper: (state: State) => NewState,
     description?: string,
   ) => Atom<NewState>,
+  filter: (
+    predicate: (state: State) => boolean,
+    description?: string,
+  ) => Atom<State>,
   subscribe: (cb: (state: State) => *) => () => void,
 };
 
