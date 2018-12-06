@@ -4,35 +4,6 @@ import ActionTypes from './utils/actionTypes';
 
 const REDUCER_EVENT_TYPE = '@@UPS/redux/REDUCER_EVENT_TYPE';
 
-class PubSubLikeRedux extends PubSub {
-  _startPublish() {
-    if (this._isPublishing === false) {
-      this._isPublishing = true;
-      this._payloads = {};
-      try {
-        this._publish();
-      } catch (e) {
-        this._isPublishing = false;
-        this._payloads = {};
-        if (e instanceof Error) throw e;
-        if (typeof e === 'string') throw new Error(e);
-        const error = new Error(
-          '@@UPS: error when notifying subscribers.' +
-            '\nSee error data in `data` property of this Error instance',
-        );
-        // $off
-        error.data = e;
-        throw error;
-      }
-
-      this._isPublishing = false;
-      this._payloads = {};
-    } else {
-      this._startOver = true;
-    }
-  }
-}
-
 export function createStore(reducer, preloadedState, enhancer) {
   if (typeof preloadedState === 'function' && typeof enhancer === 'undefined') {
     enhancer = preloadedState;
