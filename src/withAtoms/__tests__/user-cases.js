@@ -44,8 +44,6 @@ describe('user-cases', () => {
       );
     }
 
-    // TODO: shortcut for
-    // `const FirstName = multiAtom("John", memoize(v => v));`
     const FirstName = multiAtom('John');
     const LastName = multiAtom('Doe');
 
@@ -185,24 +183,4 @@ describe('user-cases', () => {
       null,
     ]);
   });
-
-  it('async1', () => {});
-[], null]);
-    expect(cb.mock.calls[1][0]).toEqual([
-      { status: 'res', data: [1, 2, 3] },
-      [1, 2, 3],
-      null,
-    ]);
-  });
-
-  it('async1', () => {});
-[], null]);
-    expect(cb.mock.calls[1][0]).toEqual([
-      { status: 'res', data: [1, 2, 3] },
-      [1, 2, 3],
-      null,
-    ]);
-  });
-
-  it('async1', () => {});
 });
