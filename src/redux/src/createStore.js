@@ -53,7 +53,7 @@ export function createStore(reducer, preloadedState, enhancer) {
   //   dispatchOriginal.call(pubSub, eventType, payload)
   // }.bind(pubSub);
   // pubSub._startPublish = function() {
-  //   this._isPublishing = this._isPublishing === false || isFinalQueueEmpty;
+  //   this._isPublishing = !this._isPublishing || (this._isPublishing && isFinalQueueEmpty && !this._finalQueue.size) ? false : true;
   //   isFinalQueueEmpty = false;
   //   _startPublishOriginal.call(pubSub)
   // }.bind(pubSub);
@@ -77,7 +77,9 @@ export function createStore(reducer, preloadedState, enhancer) {
   }
 
   function dispatch(action) {
-    pubSubDispatch(REDUCER_EVENT_TYPE, action)
+    pubSubDispatch(REDUCER_EVENT_TYPE, action);
+
+    return action;
   }
 
   function replaceReducer(nextReducer) {
