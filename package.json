@@ -1,6 +1,6 @@
 {
   "name": "@artalar/ups",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "universal pub/sub library",
   "main": "lib/index.js",
   "module": "es/index.js",
