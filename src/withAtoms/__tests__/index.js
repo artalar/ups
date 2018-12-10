@@ -4,24 +4,6 @@ import PubSub from '../../core';
 import withAtoms from '..';
 
 describe('atom', () => {
-  it('map', () => {
-    const { multiAtom } = new (withAtoms(PubSub))();
-
-    const One = multiAtom('one');
-    const Two = multiAtom('two');
-    const Shape = multiAtom(One, Two, (one, two) => ({ one, two }));
-    const One2 = multiAtom(Shape, ({ one }) => one);
-    const Two2 = multiAtom(Shape, ({ two }) => two);
-
-    const Shape2 = multiAtom(One2, Two2, (one, two) => ({ one, two }));
-
-    const view = jest.fn();
-    Shape2.subscribe(view);
-
-    One('one!');
-    expect(Shape2()).toEqual({ one: 'one!', two: 'two' });
-    expect(view.mock.calls.length).toBe(1);
-  });
 
   it('deep structure', () => {
     const cb = jest.fn();
@@ -52,5 +34,48 @@ describe('atom', () => {
     expect(a02()).toEqual([true, null, false]);
     expect(a002()).toEqual([true, [true, null, false]]);
     expect(a0001()).toEqual([true, [true, [true, null, false]]]);
+  });
+
+  it('map', () => {
+    const { multiAtom } = new (withAtoms(PubSub))();
+
+    const One = multiAtom('one');
+    const Two = multiAtom('two');
+    const Shape = multiAtom(One, Two, (one, two) => ({ one, two }));
+    const One2 = Shape.map(({ one }) => one);
+    const Two2 = Shape.map(({ two }) => two);
+
+    const Shape2 = multiAtom(One2, Two2, (one, two) => ({ one, two }));
+
+    const view = jest.fn();
+    Shape2.subscribe(view);
+
+    One('one!');
+    expect(Shape2()).toEqual({ one: 'one!', two: 'two' });
+    expect(view.mock.calls.length).toBe(1);
+  });
+
+  it('lens', () => {
+    const { multiAtom } = new (withAtoms(PubSub))();
+
+    const One = multiAtom('one');
+    const Two = multiAtom('two');
+    const Shape = multiAtom(One, Two, (one, two) => ({ one, two }));
+    const One2 = Shape.map('one');
+    const Two2 = Shape.map('two');
+
+    const Shape2 = multiAtom(One2, Two2, (one, two) => ({ one, two }));
+
+    const view = jest.fn();
+    Shape2.subscribe(view);
+
+    One('one!');
+    expect(Shape()).toEqual({ one: 'one!', two: 'two' });
+    expect(Shape2()).toEqual({ one: 'one!', two: 'two' });
+    expect(view.mock.calls.length).toBe(1);
+
+    One2('one2');
+    expect(Shape2()).toEqual({ one: 'one2', two: 'two' });
+    expect(view.mock.calls.length).toBe(2);
   });
 });

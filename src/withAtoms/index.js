@@ -64,24 +64,48 @@ function withAtoms(PubSub) {
 
       atom.eventType = `@@UPS/ATOM/[${++this._atomsCount}] ${description}`;
 
-      atom.map = function map(mapper, computedAtomDescription) {
+      atom.map = function map(getter, computedAtomDescription) {
+        const isLens = typeof getter !== 'function';
+        const mapper = isLens ? v => v[getter] : getter;
         const computedAtom = this.createAtom(
           mapper(atom()),
           computedAtomDescription,
         );
+        let awaitParent = false;
 
         computedAtom[COMPUTED_LEVEL] = atom[COMPUTED_LEVEL] + 1;
 
         this.subscribe(
           value => {
             const newValue = mapper(value);
-            if (newValue !== MEMORIZED) computedAtom(newValue);
+            if (newValue === MEMORIZED) return;
+            awaitParent = true;
+            computedAtom(newValue);
           },
           atom.eventType,
           atom[COMPUTED_LEVEL],
         );
 
-        return this._omitSetterSignature(computedAtom);
+        if (isLens) {
+          this.subscribe(
+            value => {
+              if (awaitParent) {
+                awaitParent = false;
+                return;
+              }
+              const oldShape = atom();
+              const newShape = Array.isArray(oldShape)
+                ? oldShape.splice(0)
+                : Object.assign({}, oldShape);
+              newShape[getter] = value;
+              atom(newShape);
+            },
+            computedAtom.eventType,
+            computedAtom[COMPUTED_LEVEL],
+          );
+        }
+
+        return isLens ? computedAtom : this._omitSetterSignature(computedAtom);
       }.bind(this);
 
       atom.filter = function filter(predicate, computedAtomDescription) {

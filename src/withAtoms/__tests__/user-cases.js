@@ -7,6 +7,14 @@ import type { Atom } from '..';
 
 const MEMORIZED = '@@UPS/ATOM/MEMORIZED';
 
+function memo(atom) {
+  // `undefined` memorized by default 🤔
+  let lastValue;
+  return atom.filter(value =>
+    value === lastValue ? false : ((lastValue = value), true),
+  );
+}
+
 describe('user-cases', () => {
   it('rhombus', () => {
     const { multiAtom } = new (withAtoms(PubSub))();
@@ -182,5 +190,52 @@ describe('user-cases', () => {
       [1, 2, 3],
       null,
     ]);
+  });
+
+  it('array', () => {
+    const { multiAtom } = new (withAtoms(PubSub))();
+
+    const List = multiAtom([]);
+    const listView = jest.fn();
+    List.subscribe(listView);
+
+    const FirstItem = List.map(0);
+    const firstItemView = jest.fn();
+    memo(FirstItem).subscribe(firstItemView);
+
+    const SecondItem = List.map(1);
+    const secondItemView = jest.fn();
+    memo(SecondItem).subscribe(secondItemView);
+
+    const ThirdItem = List.map(2);
+    const thirdItemView = jest.fn();
+    memo(ThirdItem).subscribe(thirdItemView);
+
+    List([1, 2]);
+    expect(List()).toEqual([1, 2]);
+    expect(FirstItem()).toBe(1);
+    expect(SecondItem()).toBe(2);
+    expect(listView.mock.calls.length).toBe(1);
+    expect(firstItemView.mock.calls.length).toBe(1);
+    expect(secondItemView.mock.calls.length).toBe(1);
+    expect(thirdItemView.mock.calls.length).toBe(0);
+
+    SecondItem(22);
+    expect(List()).toEqual([1, 22]);
+    expect(FirstItem()).toBe(1);
+    expect(SecondItem()).toBe(22);
+    expect(listView.mock.calls.length).toBe(2);
+    expect(firstItemView.mock.calls.length).toBe(1);
+    expect(secondItemView.mock.calls.length).toBe(2);
+    expect(thirdItemView.mock.calls.length).toBe(0);
+
+    List(List().concat(3));
+    expect(List()).toEqual([1, 22, 3]);
+    expect(FirstItem()).toBe(1);
+    expect(SecondItem()).toBe(22);
+    expect(listView.mock.calls.length).toBe(3);
+    expect(firstItemView.mock.calls.length).toBe(1);
+    expect(secondItemView.mock.calls.length).toBe(2);
+    expect(thirdItemView.mock.calls.length).toBe(1);
   });
 });
