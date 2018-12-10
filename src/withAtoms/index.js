@@ -95,7 +95,7 @@ function withAtoms(PubSub) {
               }
               const oldShape = atom();
               const newShape = Array.isArray(oldShape)
-                ? oldShape.splice(0)
+                ? oldShape.slice(0)
                 : Object.assign({}, oldShape);
               newShape[getter] = value;
               atom(newShape);
