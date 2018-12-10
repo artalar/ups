@@ -67,7 +67,8 @@
   "jest": {
     "transform": {
       ".jsx?$": "babel-jest"
-    }
+    },
+    "modulePathIgnorePatterns": ["<rootDir>/_redux", "<rootDir>/_mobx", "<rootDir>/src/redux"]
   },
   "directories": {
     "lib": "lib"
