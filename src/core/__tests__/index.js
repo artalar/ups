@@ -90,6 +90,45 @@ describe('core', () => {
       expect(cb1.mock.calls.length).toBe(++calls.cb1);
       expect(cb2.mock.calls.length).toBe(calls.cb2);
     });
+
+    it('subscribe during publish', () => {
+      const eventType = Math.random().toString();
+      const cb1 = jest.fn(() => pb.subscribe(cb2, eventType));
+      const cb2 = jest.fn();
+
+      pb.subscribe(cb1, eventType);
+
+      pb.dispatch(eventType);
+
+      expect(cb1.mock.calls.length).toBe(1);
+      expect(cb2.mock.calls.length).toBe(0);
+
+      pb.dispatch(eventType);
+
+      expect(cb1.mock.calls.length).toBe(2);
+      expect(cb2.mock.calls.length).toBe(1);
+    })
+
+    it('unsubscribe during publish', () => {
+      const eventType = Math.random().toString();
+      const cb1 = jest.fn(() => {
+          const unsubscribe = pb.subscribe(cb2, eventType);
+          unsubscribe();
+      });
+      const cb2 = jest.fn();
+
+      pb.subscribe(cb1, eventType);
+
+      pb.dispatch(eventType);
+
+      expect(cb1.mock.calls.length).toBe(1);
+      expect(cb2.mock.calls.length).toBe(0);
+
+      pb.dispatch(eventType);
+
+      expect(cb1.mock.calls.length).toBe(2);
+      expect(cb2.mock.calls.length).toBe(0);
+    })
   });
   it('compute circular', () => {
     const pb = new PubSub();

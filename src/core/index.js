@@ -20,20 +20,18 @@ class PubSub {
   */
   constructor(title?: string) {
     this._title = `@@UPS/${title || 'CORE'}`;
-    this._priorityQueues = [this._createQueue()];
-    this._finalQueue = this._createQueue();
+    this._priorityQueues = [this._createSet()];
+    this._finalQueue = this._createSet();
     this._eventsProperties = {};
     this._isPublishing = false;
     this._startOver = false;
+    // new subscribers delayed to end of dispatch
+    this._newSubscribers = this._createSet();
   }
 
   // For old browsers `Set` can be replaced by minimal `Set` polyfill
   // required methods: `{ add(){} delete(){} size: number }`
-  _createQueue(): Set<string> {
-    return new Set();
-  }
-
-  _createSubscribers(): Set<Function> {
+  _createSet(): Set<string> | Set<Function> {
     return new Set();
   }
 
@@ -54,8 +52,8 @@ class PubSub {
           ? this._finalQueue
           : priorityQueues[priorityQueueIndex];
         if (eventTypes.size === 0) continue;
-        if (isLastQueue) this._finalQueue = this._createQueue();
-        else priorityQueues[priorityQueueIndex] = this._createQueue();
+        if (isLastQueue) this._finalQueue = this._createSet();
+        else priorityQueues[priorityQueueIndex] = this._createSet();
 
         eventTypes.forEach(eventType => {
           const eventsProperties = this._eventsProperties[eventType];
@@ -83,6 +81,9 @@ class PubSub {
         }
       }
     } while (this._startOver);
+
+    this._newSubscribers.forEach(updateSubscribers => updateSubscribers());
+    this._newSubscribers = this._createSet();
   }
 
   _startPublish() {
@@ -114,7 +115,7 @@ class PubSub {
 
   _createEventProperties(): EventProperties {
     return {
-      subscribers: this._createSubscribers(),
+      subscribers: this._createSet(),
       prioritySubscribers: {},
     };
   }
@@ -123,11 +124,18 @@ class PubSub {
     subscribers: Set<Function>,
     listener: Function,
     eventType: string,
-    eventsProperties: { [string]: EventProperties },
   ) {
-    subscribers.add(listener);
+    const eventsProperties = this._eventsProperties;
     const eventProperties = eventsProperties[eventType];
     const { prioritySubscribers } = eventProperties;
+
+    if (this._isPublishing) {
+      const updateSubscribers = () => subscribers.add(listener);
+      this._newSubscribers.add(updateSubscribers);
+    } else {
+      subscribers.add(listener);
+    }
+
     return function unsubscribe() {
       subscribers.delete(listener);
       if (eventProperties.subscribers.size !== 0) return;
@@ -171,11 +179,11 @@ class PubSub {
 
     // `this._finalQueue`
     if (priorityIndex === undefined) {
-      return this._bindSubscriber(
+      return this._bindSubscriber.call(
+        this,
         eventProperties.subscribers,
         listener,
         eventType,
-        this._eventsProperties,
       );
     }
 
@@ -187,15 +195,15 @@ class PubSub {
       );
     }
     if (priorityQueuesLength === priorityIndex) {
-      this._priorityQueues.push(this._createQueue());
+      this._priorityQueues.push(this._createSet());
     }
-    return this._bindSubscriber(
+    return this._bindSubscriber.call(
       // prettier-ignore
+      this,
       eventProperties.prioritySubscribers[priorityIndex] ||
-        (eventProperties.prioritySubscribers[priorityIndex] = this._createSubscribers()),
+        (eventProperties.prioritySubscribers[priorityIndex] = this._createSet()),
       listener,
       eventType,
-      this._eventsProperties,
     );
   }
 
