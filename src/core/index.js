@@ -35,6 +35,10 @@ class PubSub {
     return new Set();
   }
 
+  _copySet(set) {
+    return new Set(set);
+  }
+
   _publish() {
     const priorityQueues = this._priorityQueues;
 
@@ -73,17 +77,17 @@ class PubSub {
 
           const value = this._payloads[eventType];
 
-          subscribers.forEach(subscriber => subscriber(value));
+          this._copySet(subscribers).forEach(subscriber => subscriber(value));
         });
 
         if (this._startOver) {
           priorityQueueIndex = -1;
         }
+
+        this._newSubscribers.forEach(updateSubscribers => updateSubscribers());
+        this._newSubscribers = this._createSet();
       }
     } while (this._startOver);
-
-    this._newSubscribers.forEach(updateSubscribers => updateSubscribers());
-    this._newSubscribers = this._createSet();
   }
 
   _startPublish() {
@@ -126,17 +130,20 @@ class PubSub {
     eventType: string,
   ) {
     const eventsProperties = this._eventsProperties;
+    const newSubscribers = this._newSubscribers;
     const eventProperties = eventsProperties[eventType];
     const { prioritySubscribers } = eventProperties;
 
+    let updateSubscribers;
     if (this._isPublishing) {
-      const updateSubscribers = () => subscribers.add(listener);
-      this._newSubscribers.add(updateSubscribers);
+      updateSubscribers = () => subscribers.add(listener);
+      newSubscribers.add(updateSubscribers);
     } else {
       subscribers.add(listener);
     }
 
     return function unsubscribe() {
+      newSubscribers.delete(updateSubscribers);
       subscribers.delete(listener);
       if (eventProperties.subscribers.size !== 0) return;
       const keys = Object.keys(prioritySubscribers);
