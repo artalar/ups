@@ -1,17 +1,22 @@
-import { UPS_CONTEXT_DISPATCH } from './utils/context'
-// import ActionTypes from './utils/actionTypes';
+import {
+  UPS_CONTEXT_DISPATCH,
+  IS_REDUCER,
+  REDUCER_PRIORITY_LEVEL,
+  UPS_CONTEXT_SUBSCRIBE
+} from './utils/ups'
+import ActionTypes from './utils/actionTypes'
 
-const IS_REDUCER = '@@UPS/redux/reducer/IS_REDUCER'
 const PREFIX = '@@UPS/redux/reducer/PREFIX'
-const PRIORITY_LEVEL = '@@UPS/redux/reducer/PRIORITY_LEVEL'
 
 let reducersCount = 0
 
 function noop() {}
 
+// TODO: JSDoc
 export default function createReducer(initialState) {
   const type = `${PREFIX}/${reducersCount++}`
   const handlers = {}
+  const subscribesToOtherReducers = []
 
   function reducer(state = initialState, action, upsContext = {}) {
     if (handlers.hasOwnProperty(action.type)) {
@@ -21,21 +26,34 @@ export default function createReducer(initialState) {
         ;(upsContext[UPS_CONTEXT_DISPATCH] || noop)(type, newState)
         return newState
       }
-      // else return state
+    } else if (action.type === ActionTypes.INIT) {
+      for (let i = 0; i < subscribesToOtherReducers.length; i++) {
+        const { type, priorityLevel } = subscribesToOtherReducers[i]
+        ;(upsContext[UPS_CONTEXT_SUBSCRIBE] || noop)(type, priorityLevel)
+      }
     }
     return state
   }
 
   reducer.type = type
   reducer[IS_REDUCER] = true
-  reducer[PRIORITY_LEVEL] = 0
+  reducer[REDUCER_PRIORITY_LEVEL] = 0
 
   reducer.on = function on(target, handler) {
+    if (
+      target === undefined ||
+      !(
+        typeof target === 'string' ||
+        (typeof target === 'function' && target[IS_REDUCER])
+      )
+    ) {
+      throw new Error(
+        'Target must be string (event type) or reducer (from "ups-redux/createReducer")'
+      )
+    }
+
     const actionType = typeof target === 'string' ? target : target.type
 
-    if (actionType === undefined) {
-      throw new Error('Can not resolve action type of targer')
-    }
     if (handlers.hasOwnProperty(actionType)) {
       throw new Error(`Action type "${actionType}" already binded to reducer`)
     }
@@ -43,9 +61,13 @@ export default function createReducer(initialState) {
     handlers[actionType] = handler
 
     if (target[IS_REDUCER]) {
-      reducer[PRIORITY_LEVEL] = Math.max(
-        reducer[PRIORITY_LEVEL],
-        target[PRIORITY_LEVEL] + 1
+      subscribesToOtherReducers.push({
+        type: target.type,
+        priorityLevel: target[REDUCER_PRIORITY_LEVEL]
+      })
+      reducer[REDUCER_PRIORITY_LEVEL] = Math.max(
+        reducer[REDUCER_PRIORITY_LEVEL],
+        target[REDUCER_PRIORITY_LEVEL] + 1
       )
     }
 

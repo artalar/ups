@@ -3,7 +3,11 @@ import { PubSub } from '@artalar/ups-core'
 
 import ActionTypes from './utils/actionTypes'
 import isPlainObject from './utils/isPlainObject'
-import { UPS_CONTEXT_DISPATCH } from './utils/context';
+import {
+  UPS_CONTEXT_DISPATCH,
+  IS_REDUCER,
+  UPS_CONTEXT_SUBSCRIBE
+} from './utils/ups'
 
 const REDUCER_EVENT_TYPE = '@@UPS/redux/REDUCER_EVENT_TYPE'
 
@@ -77,7 +81,14 @@ export default function createStore(reducer, preloadedState, enhancer) {
   let isDispatching = false
   const pubSub = new PubSub()
   const upsContext = {
-    [UPS_CONTEXT_DISPATCH]: (type, payload) => pubSub.dispatch(type, payload)
+    [UPS_CONTEXT_DISPATCH]: (type, payload) => pubSub.dispatch(type, payload),
+    [UPS_CONTEXT_SUBSCRIBE]: (type, priorityIndex) =>
+      pubSub.subscribe(
+        // FIXME: cache updater by type
+        state => update({ type, state }),
+        type,
+        priorityIndex
+      )
   }
 
   synchronizeDispatch(pubSub)
@@ -96,7 +107,7 @@ export default function createStore(reducer, preloadedState, enhancer) {
    *
    * @returns {any} The current state tree of your application.
    */
-    function getState() {
+  function getState() {
     if (isDispatching) {
       throw new Error(
         'You may not call store.getState() while the reducer is executing. ' +
@@ -145,9 +156,19 @@ export default function createStore(reducer, preloadedState, enhancer) {
       )
     }
 
+    if (typeof eventType === 'function') {
+      if (eventType[IS_REDUCER]) {
+        eventType = eventType.type
+      } else {
+        // TODO: improve error description
+        throw new Error('Reducer is not from "ups-redux/createReducer"')
+      }
+    }
+
     let isSubscribed = true
 
-    const callback = eventType === REDUCER_EVENT_TYPE ? () => listener() : listener
+    const callback =
+      eventType === REDUCER_EVENT_TYPE ? () => listener() : listener
     const _unsubscribe = pubSub.subscribe(callback, eventType)
 
     return function unsubscribe() {

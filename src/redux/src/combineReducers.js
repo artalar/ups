@@ -1,6 +1,7 @@
 import ActionTypes from './utils/actionTypes'
 import warning from './utils/warning'
 import isPlainObject from './utils/isPlainObject'
+import { REDUCER_PRIORITY_LEVEL } from './utils/ups'
 
 function getUndefinedStateErrorMessage(key, action) {
   const actionType = action && action.type
@@ -115,6 +116,7 @@ function assertReducerShape(reducers) {
 export default function combineReducers(reducers) {
   const reducerKeys = Object.keys(reducers)
   const finalReducers = {}
+  let priorityLevel = 0
   for (let i = 0; i < reducerKeys.length; i++) {
     const key = reducerKeys[i]
 
@@ -126,6 +128,10 @@ export default function combineReducers(reducers) {
 
     if (typeof reducers[key] === 'function') {
       finalReducers[key] = reducers[key]
+      priorityLevel = Math.max(
+        priorityLevel,
+        (finalReducers[REDUCER_PRIORITY_LEVEL] || 0) + 1
+      )
     }
   }
   const finalReducerKeys = Object.keys(finalReducers)
@@ -142,7 +148,7 @@ export default function combineReducers(reducers) {
     shapeAssertionError = e
   }
 
-  return function combination(state = {}, action) {
+  function combination(state = {}, action, upsContext) {
     if (shapeAssertionError) {
       throw shapeAssertionError
     }
@@ -165,7 +171,7 @@ export default function combineReducers(reducers) {
       const key = finalReducerKeys[i]
       const reducer = finalReducers[key]
       const previousStateForKey = state[key]
-      const nextStateForKey = reducer(previousStateForKey, action)
+      const nextStateForKey = reducer(previousStateForKey, action, upsContext)
       if (typeof nextStateForKey === 'undefined') {
         const errorMessage = getUndefinedStateErrorMessage(key, action)
         throw new Error(errorMessage)
@@ -175,4 +181,8 @@ export default function combineReducers(reducers) {
     }
     return hasChanged ? nextState : state
   }
+
+  combination[REDUCER_PRIORITY_LEVEL] = priorityLevel
+
+  return combination
 }
