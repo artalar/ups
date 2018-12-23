@@ -1,6 +1,6 @@
 {
-  "name": "@artalar/ups",
-  "version": "0.0.10",
+  "name": "@artalar/ups-core",
+  "version": "0.0.11",
   "description": "universal pub/sub library",
   "main": "lib/index.js",
   "module": "es/index.js",
@@ -60,6 +60,8 @@
   },
   "homepage": "https://github.com/artalar/ups",
   "keywords": [
+    "EventEmitter",
+    "PubSub",
     "state-manager",
     "state",
     "reactive"
@@ -67,12 +69,7 @@
   "jest": {
     "transform": {
       ".jsx?$": "babel-jest"
-    },
-    "modulePathIgnorePatterns": [
-      "<rootDir>/_redux",
-      "<rootDir>/_mobx",
-      "<rootDir>/src/redux"
-    ]
+    }
   },
   "directories": {
     "lib": "lib"
