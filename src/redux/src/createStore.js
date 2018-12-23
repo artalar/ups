@@ -1,5 +1,5 @@
 import $$observable from 'symbol-observable'
-import { PubSub } from '@artalar/ups'
+import { PubSub } from '@artalar/ups-core'
 
 import ActionTypes from './utils/actionTypes'
 import isPlainObject from './utils/isPlainObject'

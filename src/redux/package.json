@@ -48,7 +48,7 @@
     "examples:test": "cross-env CI=true babel-node examples/testAll.js"
   },
   "dependencies": {
-    "@artalar/ups": "0.0.10",
+    "@artalar/ups-core": "0.0.11",
     "loose-envify": "^1.4.0",
     "symbol-observable": "^1.2.0"
   },
