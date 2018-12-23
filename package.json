@@ -1,6 +1,6 @@
 {
   "name": "@artalar/ups",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "universal pub/sub library",
   "main": "lib/index.js",
   "module": "es/index.js",
@@ -68,7 +68,11 @@
     "transform": {
       ".jsx?$": "babel-jest"
     },
-    "modulePathIgnorePatterns": ["<rootDir>/_redux", "<rootDir>/_mobx", "<rootDir>/src/redux"]
+    "modulePathIgnorePatterns": [
+      "<rootDir>/_redux",
+      "<rootDir>/_mobx",
+      "<rootDir>/src/redux"
+    ]
   },
   "directories": {
     "lib": "lib"
