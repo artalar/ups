@@ -1,21 +1,24 @@
+import { UPS_CONTEXT_DISPATCH } from './utils/context'
 // import ActionTypes from './utils/actionTypes';
 
 const IS_REDUCER = '@@UPS/redux/reducer/IS_REDUCER'
 const PREFIX = '@@UPS/redux/reducer/PREFIX'
 const PRIORITY_LEVEL = '@@UPS/redux/reducer/PRIORITY_LEVEL'
+
 let reducersCount = 0
+
 function noop() {}
 
 export default function createReducer(initialState) {
   const type = `${PREFIX}/${reducersCount++}`
   const handlers = {}
 
-  function reducer(state = initialState, action, dispatch = noop) {
+  function reducer(state = initialState, action, upsContext = {}) {
     if (handlers.hasOwnProperty(action.type)) {
       const payload = action.type.startsWith(PREFIX) ? action.state : action
       const newState = handlers[action.type](state, payload)
       if (newState !== state) {
-        dispatch(type, newState)
+        ;(upsContext[UPS_CONTEXT_DISPATCH] || noop)(type, newState)
         return newState
       }
       // else return state
