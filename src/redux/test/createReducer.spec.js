@@ -55,8 +55,9 @@ describe('Utils', () => {
         counter1: counterReducer1,
         counter2: counterReducer2
       })
+      const rootReducerTracked = jest.fn(rootReducer)
 
-      const store = createStore(rootReducer)
+      const store = createStore(rootReducerTracked)
       expect(store.getState()).toEqual({
         counter1: 0,
         counter2: 0
@@ -72,6 +73,67 @@ describe('Utils', () => {
       expect(store.getState()).toEqual({
         counter1: 2,
         counter2: 3
+      })
+    })
+
+    it('glitch free', () => {
+      const toggle = 'TOGGLE'
+      const reducer3Track = jest.fn(Object.assign)
+
+      const reducer1 = createReducer(false).on(toggle, v => !v)
+      const reducer2 = createReducer({ reducer1: reducer1.getInit() }).on(
+        reducer1,
+        (_, reducer1) => ({ reducer1 })
+      )
+      const reducer12 = combineReducers({
+          reducer1,
+          reducer2
+        })
+      const reducer3 = createReducer({
+        reducer1: reducer1.getInit(),
+        reducer2: reducer2.getInit()
+      }).on(
+        reducer12,
+        reducer3Track
+      )
+
+      const rootReducer = combineReducers({
+        reducer1,
+        reducer2,
+        reducer12,
+        reducer3
+      })
+
+      const rootReducerTracked = jest.fn(rootReducer)
+
+      const store = createStore(rootReducerTracked)
+      expect(store.getState()).toEqual({
+        reducer1: false,
+        reducer2: { reducer1: false },
+        reducer12: { reducer1: false, reducer2: { reducer1: false } },
+        reducer3: { reducer1: false, reducer2: { reducer1: false } }
+      })
+      // init
+      expect(rootReducerTracked.mock.calls.length).toBe(1)
+      expect(reducer3Track.mock.calls.length).toBe(0)
+
+      store.dispatch({ type: toggle })
+      expect(store.getState()).toEqual({
+        reducer1: true,
+        reducer2: { reducer1: true },
+        reducer12: { reducer1: true, reducer2: { reducer1: true } },
+        reducer3: { reducer1: true, reducer2: { reducer1: true } }
+      })
+      // init, toggle, reducer1, reducer2, reducer12
+      expect(rootReducerTracked.mock.calls.length).toBe(5)
+      expect(reducer3Track.mock.calls.length).toBe(1)
+
+      store.dispatch({ type: toggle })
+      expect(store.getState()).toEqual({
+        reducer1: false,
+        reducer2: { reducer1: false },
+        reducer12: { reducer1: false, reducer2: { reducer1: false } },
+        reducer3: { reducer1: false, reducer2: { reducer1: false } }
       })
     })
   })

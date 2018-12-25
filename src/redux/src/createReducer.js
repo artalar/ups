@@ -2,34 +2,33 @@ import {
   UPS_CONTEXT_DISPATCH,
   IS_REDUCER,
   REDUCER_PRIORITY_LEVEL,
-  UPS_CONTEXT_SUBSCRIBE
+  UPS_CONTEXT_SUBSCRIBE,
+  getNewReducerName,
+  REDUCER_PREFIX,
+  upsContextNoop
 } from './utils/ups'
 import ActionTypes from './utils/actionTypes'
 
-const PREFIX = '@@UPS/redux/reducer/PREFIX'
-
-let reducersCount = 0
-
-function noop() {}
-
 // TODO: JSDoc
 export default function createReducer(initialState) {
-  const type = `${PREFIX}/${reducersCount++}`
+  const type = getNewReducerName()
   const handlers = {}
-  const subscribesToOtherReducers = []
+  const otherReducerSubscriptions = []
 
-  function reducer(state = initialState, action, upsContext = {}) {
+  function reducer(state = initialState, action, upsContext = upsContextNoop) {
     if (handlers.hasOwnProperty(action.type)) {
-      const payload = action.type.startsWith(PREFIX) ? action.state : action
+      const payload = action.type.startsWith(REDUCER_PREFIX)
+        ? action.state
+        : action
       const newState = handlers[action.type](state, payload)
       if (newState !== state) {
-        ;(upsContext[UPS_CONTEXT_DISPATCH] || noop)(type, newState)
+        upsContext[UPS_CONTEXT_DISPATCH](type, newState)
         return newState
       }
     } else if (action.type === ActionTypes.INIT) {
-      for (let i = 0; i < subscribesToOtherReducers.length; i++) {
-        const { type, priorityLevel } = subscribesToOtherReducers[i]
-        ;(upsContext[UPS_CONTEXT_SUBSCRIBE] || noop)(type, priorityLevel)
+      for (let i = 0; i < otherReducerSubscriptions.length; i++) {
+        const { type, priorityLevel } = otherReducerSubscriptions[i]
+        upsContext[UPS_CONTEXT_SUBSCRIBE](type, priorityLevel)
       }
     }
     return state
@@ -38,6 +37,10 @@ export default function createReducer(initialState) {
   reducer.type = type
   reducer[IS_REDUCER] = true
   reducer[REDUCER_PRIORITY_LEVEL] = 0
+
+  reducer.getInit = function getInit() {
+    return initialState
+  }
 
   reducer.on = function on(target, handler) {
     if (
@@ -61,7 +64,7 @@ export default function createReducer(initialState) {
     handlers[actionType] = handler
 
     if (target[IS_REDUCER]) {
-      subscribesToOtherReducers.push({
+      otherReducerSubscriptions.push({
         type: target.type,
         priorityLevel: target[REDUCER_PRIORITY_LEVEL]
       })

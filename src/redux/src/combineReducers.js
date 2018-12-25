@@ -1,7 +1,14 @@
 import ActionTypes from './utils/actionTypes'
 import warning from './utils/warning'
 import isPlainObject from './utils/isPlainObject'
-import { REDUCER_PRIORITY_LEVEL } from './utils/ups'
+import {
+  REDUCER_PRIORITY_LEVEL,
+  IS_REDUCER,
+  getNewReducerName,
+  UPS_CONTEXT_SUBSCRIBE,
+  upsContextNoop,
+  UPS_CONTEXT_DISPATCH
+} from './utils/ups'
 
 function getUndefinedStateErrorMessage(key, action) {
   const actionType = action && action.type
@@ -116,6 +123,8 @@ function assertReducerShape(reducers) {
 export default function combineReducers(reducers) {
   const reducerKeys = Object.keys(reducers)
   const finalReducers = {}
+  const type = getNewReducerName()
+  const otherReducerSubscriptionsTypes = []
   let priorityLevel = 0
   for (let i = 0; i < reducerKeys.length; i++) {
     const key = reducerKeys[i]
@@ -127,11 +136,15 @@ export default function combineReducers(reducers) {
     }
 
     if (typeof reducers[key] === 'function') {
-      finalReducers[key] = reducers[key]
-      priorityLevel = Math.max(
-        priorityLevel,
-        (finalReducers[REDUCER_PRIORITY_LEVEL] || 0) + 1
-      )
+      const reducer = reducers[key]
+      finalReducers[key] = reducer
+      if (reducer[IS_REDUCER]) {
+        otherReducerSubscriptionsTypes.push(reducer.type)
+        priorityLevel = Math.max(
+          priorityLevel,
+          reducer[REDUCER_PRIORITY_LEVEL] + 1
+        )
+      }
     }
   }
   const finalReducerKeys = Object.keys(finalReducers)
@@ -148,7 +161,7 @@ export default function combineReducers(reducers) {
     shapeAssertionError = e
   }
 
-  function combination(state = {}, action, upsContext) {
+  function combination(state = {}, action, upsContext = upsContextNoop) {
     if (shapeAssertionError) {
       throw shapeAssertionError
     }
@@ -179,10 +192,29 @@ export default function combineReducers(reducers) {
       nextState[key] = nextStateForKey
       hasChanged = hasChanged || nextStateForKey !== previousStateForKey
     }
-    return hasChanged ? nextState : state
+
+    if (action && action.type === ActionTypes.INIT) {
+      for (let i = 0; i < otherReducerSubscriptionsTypes.length; i++) {
+        upsContext[UPS_CONTEXT_SUBSCRIBE](
+          otherReducerSubscriptionsTypes[i],
+          priorityLevel
+        )
+      }
+    }
+
+    if (hasChanged) {
+      upsContext[UPS_CONTEXT_DISPATCH](type, nextState)
+      return nextState
+    }
+    return state
   }
 
+  combination[IS_REDUCER] = true
   combination[REDUCER_PRIORITY_LEVEL] = priorityLevel
+  combination.type = type
+  combination.getInit = function getInit() {
+    return combination(undefined, { type: ActionTypes.INIT })
+  }
 
   return combination
 }

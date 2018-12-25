@@ -16,7 +16,22 @@ function synchronizeDispatch(pubSub) {
   const dispatchOriginal = pubSub.dispatch.bind(pubSub)
   pubSub.dispatch = function dispatch(eventType, payload) {
     if (eventType === REDUCER_EVENT_TYPE) this._isPublishing = false
-    dispatchOriginal(eventType, payload)
+    return dispatchOriginal(eventType, payload)
+  }.bind(pubSub)
+}
+
+function straightenPriorityQueuesLength(pubSub) {
+  const subscribeOriginal = pubSub.subscribe.bind(pubSub)
+  pubSub.subscribe = function subscribe(listener, eventType, priorityIndex) {
+    const priorityQueuesLength = this._priorityQueues.length
+    for (
+      let _priorityIndex = priorityIndex || 0;
+      _priorityIndex <= priorityQueuesLength;
+      _priorityIndex++
+    ) {
+      this._priorityQueues.push(this._createSet())
+    }
+    return subscribeOriginal(listener, eventType, priorityIndex)
   }.bind(pubSub)
 }
 
@@ -82,16 +97,36 @@ export default function createStore(reducer, preloadedState, enhancer) {
   const pubSub = new PubSub()
   const upsContext = {
     [UPS_CONTEXT_DISPATCH]: (type, payload) => pubSub.dispatch(type, payload),
-    [UPS_CONTEXT_SUBSCRIBE]: (type, priorityIndex) =>
-      pubSub.subscribe(
-        // FIXME: cache updater by type
-        state => update({ type, state }),
-        type,
-        priorityIndex
-      )
+    [UPS_CONTEXT_SUBSCRIBE]: (type, priorityIndex) => {
+      let subscription = upsContext[type];
+      if (subscription !== undefined) {
+        if (priorityIndex < subscription.priorityIndex) {
+          subscription.priorityIndex = priorityIndex
+          subscription.unsubscribe();
+          subscription.unsubscribe = pubSub.subscribe(
+            subscription.cb,
+            type,
+            priorityIndex
+          )
+        }
+      } else {
+        subscription = {
+          cb: state => update({ type, state }),
+          priorityIndex,
+        }
+        subscription.unsubscribe = pubSub.subscribe(
+          subscription.cb,
+          type,
+          priorityIndex
+        )
+        upsContext[type] = subscription
+      }
+    }
   }
+  const upsContextUpdatersCache = {}
 
   synchronizeDispatch(pubSub)
+  straightenPriorityQueuesLength(pubSub)
 
   function update(action) {
     try {
@@ -306,6 +341,6 @@ export default function createStore(reducer, preloadedState, enhancer) {
     subscribe,
     getState,
     replaceReducer,
-    [$$observable]: observable
+    [$$observable]: observable,
   }
 }
