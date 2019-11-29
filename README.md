@@ -1,4 +1,5 @@
-# WIP
+> # OUT OF DATE and NOT MAINTAINED
+> see https://github.com/artalar/reatom
 
 ## 🔋 UPS - universal pub/sub library for synchronous reactive programming
 
